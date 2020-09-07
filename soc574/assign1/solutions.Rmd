@@ -1,0 +1,101 @@
+---
+title: "Solutions - Joseph Risi"
+output: word_document
+---
+
+```{r, echo = F, warning = F, message = F}
+library(here)
+library(purrr)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+```
+
+* **int1wksc**:
+    * A values of 1 means the youth was employed at least one week during the school year at age 16 and worked more than 20 hours per week on average.
+    * A value of 0 means they failed to meet at least one of the above conditions.
+* **vcrime17**: Seven-item variety score for criminal behavior at age 17. The youth is is deemed to have participated in a particular type of delinquency if they report at least one act in the past year.
+    * 0 = No Crime (assumption)
+    * 1 = vandalism
+    * 2 = petty theft (less than 50 dollars)
+    * 3 = major theft (greater than 50 dollars)
+    * 4 = motor vehicle theft
+    * 5 = other property crimes
+    * 6 = aggravated assault
+    * 7 = selling drugs
+
+```{r, echo = F}
+BarPlotCrime <- function(df) {
+    ggplot(df, aes(x = new_vcrime17)) +
+    scale_y_continuous(breaks = seq(0, 0.8, 0.05)) +
+    geom_bar(aes(y = ..count../ sum(..count..))) +
+    labs(x = "Crime", y = "Percentage") +
+    theme_bw()
+}
+```
+
+```{r, echo = F}
+data <-
+    foreign::read.dta(here("assign1", "nlsy.dta")) %>%
+    mutate(new_vcrime17 = fct_recode(as.character(vcrime17),
+                                     "No Crime" = "0",
+                                     "Vandalism" = "1",
+                                     "Petty Theft" = "2",
+                                     "Major Theft" = "3",
+                                     "Motor Vehicle Theft" = "4",
+                                     "Other Property Crimes" = "5",
+                                     "Aggravated Assault" = "6",
+                                     "Selling Drugs" = "7"))
+```
+
+```{r, echo = F, fig.width = 10, fig.height = 4}
+distAll <- BarPlotCrime(data)
+distCrime <- data %>%  filter(new_vcrime17 != "No Crime") %>% BarPlotCrime()
+
+distAll
+distCrime
+```
+
+**1)**
+
+The overwhelming majority of students haven't committed a crime (nearly 80%). If we consider only those students who have committed a crime, 60% of them committed vandalism, ~22% committed petty theft, ~8% committed major theft, ~5% committed motor vehicle theft, Other Property Crime, Aggravated Assault, and Selling Drugs are each around 1%.
+
+It's hard to say how well this particular sample generalizes to the broader population (of 17 year-olds in the United States) because I don't know anything about the sampling procedure. How were students selected for this sample? I would want to know if it was random or not. Are all these students sampled from the same school or different schools? How the school(s) were chosen would then have to be considered as well. Absent knowledge of the sampling procedure, one could check against census records and officially reported/self-reported crime statistics to see how well the distributions match.
+
+```{r, echo = F, fig.width = 10, fig.height = 4, message = F, warning = F}
+dataSplitWork <-
+    data %>%
+    group_by(int1wksc, new_vcrime17) %>%
+    summarise(crime_total = n()) %>%
+    mutate(crime_prcnt = crime_total / sum(crime_total))
+
+ggplot(dataSplitWork, aes(x = new_vcrime17, y = crime_prcnt)) +
+    scale_y_continuous(breaks = seq(0, 0.8, 0.05)) +
+    geom_bar(stat = "identity", aes(fill = as.character(int1wksc)),
+             position = "dodge") +
+    labs(x = "Crime", y = "Percentage") +
+    guides(fill = guide_legend(title = "Work Status")) +
+    theme_bw()
+```
+
+**2)**
+
+The distribution of delinquency between those students who worked versus those students who didn't work are quite similar, but there are some key differences.
+
+The difference in the percentage of students who did not commit a crime was about 5% between those students who worked and those who didn't work.
+
+Those students who did work committed more crimes, relatively speaking, in basically every category (except for major theft where the rates appear pretty even).
+
+**3)**
+
+Based on the data provided, I am not comfortable saying anything regarding the effects of intensive employment on juvenile delinquency. This is because it isn't clear to me how students were selected into the intensive work program. If this was an experiment, and students were randomly assigned or not assigned to intensive work, I might be more inclined to argue one way or another.
+
+If students weren't randomly assigned, then this data has really nothing to say regarding the effects of intensive employment on juvenile delinquency. For example, if students who were already pre-disposed to juvenile delinquency were selected for entry into intensive employment, then we would expect them, a priori, to have higher crime rates. One could argue (absent experimental data) the program actually decreased crimes rates relative to what they might have been absent this program. It's just the crime rates didn't decrease to the levels seen for students who aren't pre-disposed to crime.
+
+**4)**
+
+I don't know enough to say if the measures are valid. There are a variety of reasons they might not be valid. Officially reported crime statistics suffer from all sorts of biases. So if these crime statistics are officially reported, one would have to take them with a grain of salt. Self-reported crime statistics also have their own issues so it would be best to test hypotheses on both officially reported crime statistics and self-reported crime statistics.
+
+I would also want to know how the intensive work measure variable was created. Who/what was verifying the youth actually worked at least 20 hours a week on average? Why is the measure for only "at least a week?" There could be more/less of an effect depending on how many weeks a youth works. The same argument applies for the number of hours worked per week as well.
+
+Additionally it strikes me as a bit strange that intensive work is observed at age 16 but then crime is observed at age 17. I would imagine that an intensive work program would be most effective while its happening not a year later.
