@@ -1,0 +1,63 @@
+---
+title: "Solutions HW#4 SOC 574 - Joseph Risi"
+output: word_document
+---
+
+```{r, echo = F, warning = F, message = F}
+library(here)
+library(purrr)
+library(dplyr)
+library(tidyr)
+library(forcats)
+library(ggplot2)
+library(flextable)
+```
+
+```{r, echo = F}
+data <- foreign::read.dta(here("data", "nlsy.dta"))
+```
+
+```{r, echo = F, message = F, warning = F}
+data_split <-
+    data %>%
+    group_by(int1wksc) %>%
+    summarise(mean = mean(grades8),
+              sd = sd(grades8),
+              n = n(),
+              stdError = sd / sqrt(n),
+              tscore_95 = qt(1 - 0.05 / 2, df = n - 1),
+              tscore_98 = qt(1 - 0.02 / 2, df = n - 1),
+              marginOfError_95 = tscore_95 * stdError,
+              marginOfError_98 = tscore_98 * stdError,
+              lowerCI_95 = mean - marginOfError_95,
+              upperCI_95 = mean + marginOfError_95,
+              lowerCI_98 = mean - marginOfError_98,
+              upperCI_98 = mean + marginOfError_98) %>%
+    pivot_longer(cols = !matches("^mean$|^sd$|^n$|^stdError$|int1wksc"),
+                 names_to = c("variables", "confidence"),
+                 names_pattern = "([a-zA-Z]{1,13})_([0-9]{2})") %>%
+    pivot_wider(names_from = "variables", values_from = "value") %>%
+    mutate(ci = paste0("(", round(lowerCI, 4), ", ", round(upperCI, 4), ")"),
+              .keep = "unused") %>%
+    arrange(confidence)
+```
+
+```{r, echo = F}
+flextable(data_split)
+```
+
+**3a)**
+
+The 95% confidence interval for those students who engaged in intensive work during high school is approximately `r data_split %>% filter(int1wksc == 1, confidence == 95) %>% pull(ci)`. Of the students who engaged in intensive work, I am 95% certain their true **average** grade score lies between `r data_split %>% filter(int1wksc == 1, confidence == 95) %>% pull(ci)` with my best estimate being `r data_split %>% filter(int1wksc == 1, confidence == 95) %>% pull(mean)`.
+
+**3b)**
+
+The 95% confidence interval for those students who **did not engage** in intensive work during high school is approximately `r data_split %>% filter(int1wksc == 0, confidence == 95) %>% pull(ci)`. Of the students who did not engage in intensive work, I am 95% certain their true **average** grade score lies between `r data_split %>% filter(int1wksc == 0, confidence == 95) %>% pull(ci)` with my best estimate being `r data_split %>% filter(int1wksc == 0, confidence == 95) %>% pull(mean)`.
+
+**3c)**
+
+The 95% confidence intervals do slightly overlap for the two groups which means I am not convinced that intensive work negatively affects grades.
+
+**3d)**
+
+The intervals got wider since I made my t-scores higher. The qualitative judgment concerning the effect of intensive work on grades remains the same, however. Meaning, I am still not convinced intensive work has a negative impact on grades.

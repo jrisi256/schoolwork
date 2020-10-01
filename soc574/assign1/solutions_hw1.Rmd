@@ -36,7 +36,7 @@ BarPlotCrime <- function(df) {
 
 ```{r, echo = F}
 data <-
-    foreign::read.dta(here("assign1", "nlsy.dta")) %>%
+    foreign::read.dta(here("data", "nlsy.dta")) %>%
     mutate(new_vcrime17 = fct_recode(as.character(vcrime17),
                                      "No Crime" = "0",
                                      "Vandalism" = "1",
