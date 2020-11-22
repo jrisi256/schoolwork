@@ -1,9 +1,12 @@
 ---
 title: "Assignment 7"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r}
+library(car)
 library(here)
 library(dplyr)
 library(purrr)
@@ -30,7 +33,9 @@ data <-
 * **employed**: Indicates if head of household had recorded work or not in 1996 (**hours** is greater than 0).
     * 1 = worked
     * 0 = no recorded work
-* **labor_exprnc**: Years of labor market experience (**age** - **educ** - 6).
+* **labor_exprnc**: Years of *prior* labor market experience (**age** - **educ** - 6).
+    * **Data issue**: One individual had negative years of prior labor market experience. They were left as is however it may make sense to recode them to be 0.
+    * I also clarified the labor experience variable is counting **prior** years of labor market experience because we aren't taking into account the current year.
 
 ```{r}
 dataNew <-
@@ -52,7 +57,7 @@ Limit analysis only to households where the head is working
 dataWorking <- dataNew %>% filter(employed == 1)
 ```
 
-**Parts A and B**
+### Parts A and B
 
 ```{r}
 ggplot(dataWorking, aes(x = labor_exprnc, y = hourly_wage)) +
@@ -60,9 +65,9 @@ ggplot(dataWorking, aes(x = labor_exprnc, y = hourly_wage)) +
     geom_smooth(method = "lm", se = F, formula = y ~ x) +
     scale_y_continuous(breaks = seq(0, 250, 25)) +
     theme_bw()
-
-cor(dataWorking$labor_exprnc, dataWorking$hourly_wage)
 ```
+
+Correlation Coefficient: `r cor(dataWorking$labor_exprnc, dataWorking$hourly_wage)`
 
 The sample correlation is quite weak. Both the *eyeball test* as well as the numerically calculated correlation indicate there isn't much of an association between the two variables. This is counterintuitive because one would think the more labor market experience a person had the higher their wages would be. There are a vast number of explanations which might explain why the two aren't related:
 
@@ -70,17 +75,116 @@ The sample correlation is quite weak. Both the *eyeball test* as well as the num
 * it might be the case one needs *relevant* work experience thus not all years of work experience are created equal.
 * etc.
 
-**Part C**
+### Part C
 
 ```{r}
-ols <- lm(hourly_wage ~ labor_exprnc, data = dataWorking)
-summary(ols)
-qf(0.95, df1 = 2880, df2 = 1)
-qf(0.95, df1 = 1, df2 = 2880)
-df(48, df1 = 1, df2 = nrow(dataWorking) - 2)
+olsLaborE <- lm(hourly_wage ~ labor_exprnc, data = dataWorking)
+summary(olsLaborE)
+anova(olsLaborE)
+ssrrLaborE <- anova(olsLaborE)["Sum Sq"]["Residual",]
 ```
-The estimate for $\beta_1$ is 0.20998. It is significantly different from 0 at 0.05 significance level. This means in this sample for each year of work experience accumulated you would, on average, earn about 21 cents more per hour.
+The estimate for $\beta_1$ is approximately 0.20998. It is significantly different from 0 at 0.05 significance level. This means in this sample for each year of work experience accumulated you would, on average, earn about 21 cents more per hour.
 
-**Part D**
+### Part D
 
-The F-statistic for the model is 43 (with 1 and 2880 degrees of freedom).
+The F-statistic for the model is 43 (with 1 and 2880 degrees of freedom). The critical value one should use to reject the null hypothesis at $\alpha = 0.05$ level of significance would be `r qf(0.95, df1 = 1, df2 = nrow(dataWorking))`. Thus we can reject the null hypothesis.
+
+### Part E
+
+t-statistic: `r summary(olsLaborE)[["coefficients"]][, "t value"][["labor_exprnc"]]`  
+t-statistic (squared): `r summary(olsLaborE)[["coefficients"]][, "t value"][["labor_exprnc"]] ^ 2`  
+F-statistic: `r summary(olsLaborE)[["fstatistic"]][["value"]]`
+
+The F-statistic is equal to the t-statistic squared.
+
+## Question 2
+
+### Part A
+
+```{r}
+ggplot(dataWorking, aes(x = educ, y = hourly_wage)) +
+    geom_point() +
+    geom_smooth(method = "lm", formula = y ~ x, se = F) +
+    labs(title = "Hourly Wages vs. Years of Education") +
+    theme_bw()
+    
+ggplot(dataWorking, aes(x = educ, y = labor_exprnc)) +
+    geom_point() +
+    geom_smooth(method = "lm", formula = y ~ x, se = F) +
+    labs(title = "Years of Education vs. Years of Labor Experience") +
+    theme_bw()
+```
+
+Correlation Coefficient Between Education and Wages: `r cor(dataWorking$hourly_wage, dataWorking$educ)`  
+Correlation Coefficient Between Education and Work Experience: `r cor(dataWorking$labor_exprnc, dataWorking$educ)`
+
+The sample correlation being weakly negative for years of education and years of labor market experience makes sense I think. You would expect individuals with more years of education, all else being equal, would have less years in the labor market. There are many other variables though which come to bear on this relationship (not everything else is equal) hence the relationship isn't stronger.
+
+### Part B
+
+```{r}
+olsEducLaborE <-lm(hourly_wage ~ labor_exprnc + educ, data = dataWorking)
+summary(olsEducLaborE)
+anova(olsEducLaborE)
+ssruEducLaborE <- anova(olsEducLaborE)["Sum Sq"]["Residual",]
+```
+
+The estimate for $\beta_1$ is approximately 0.26901. It is significantly different from 0 at the $\alpha = 0.05$ level of significance. In the first regression, education was implicitly in the error term. Because it is negatively correlated with labor market experience, it was slightly downvoting the coefficient for labor market experience. I.e. the effect of labor market experience was being slightly confounded by education. Once the education variable was made explicit, its negative effect on labor market experience went away and the coefficient increased reflecting a more accurate estimate. This means I do believe the estimate for $\beta_1$ is a better estimate in regression 2 versus regression 1.
+
+### Part C
+
+$\alpha = 0.05$  
+degrees of freedom are `r nrow(dataWorking) - 3`  
+$H_o: \beta_2 = 0$  
+$H_a: \beta_2 \neq 0$  
+t-statistic of rejection: `r qt(0.95, df = nrow(dataWorking) - 3)`  
+t-statistic for education from regression 2: `r summary(olsEducLaborE)[["coefficients"]][, "t value"][["educ"]]`
+
+We can therefore reject the null hypothesis and state the coefficient on education is statistically significantly different from 0.
+
+```{r}
+fstatEduc <- ((ssrrLaborE - ssruEducLaborE) / 1) / (ssruEducLaborE / (nrow(dataWorking) - 3))
+```
+
+$\alpha = 0.05$  
+$H_o: \beta_2 = 0$  
+$H_a: \beta_2 \neq 0$  
+Degrees of freedom for the numerator: 2  
+Degrees of freedom for the denominator: `r nrow(dataWorking) - 3`  
+Sum of Squared Residuals from Restricted Model (Model #1): `r ssrrLaborE`  
+Sum of Squared Residuals from Unrestricted Model (Model #2): `r ssruEducLaborE`  
+F-statistic of rejection: `r qf(0.95, df1 = 2, df2 = 2879)`  
+F-statistic: `r fstatEduc`  
+t-statistic squared: `r summary(olsEducLaborE)[["coefficients"]][, "t value"][["educ"]] * 2`
+
+We can therefore reject the null hypothesis and state that adding in the education variable statistically significantly increases the amount of variation explained in the dependent variable by the regression model.
+
+The F-test and t-test agree with each other, and the F-statistic is the square of the t-statistic.
+
+### Part D
+
+$\alpha = 0.05$  
+$H_o: \beta_1 = \beta_2 = 0$  
+$H_a: \beta_1 \neq 0, \beta_2 \neq 0$  
+Degrees of freedom for the numerator: 2  
+Degrees of freedom for the denominator: `r nrow(dataWorking) - 3`  
+F-statistic of rejection: `r qf(0.95, df1 = 2, df2 = 2879)`  
+F-statistic: `r summary(olsEducLaborE)[["fstatistic"]][["value"]]`  
+
+We can therefore reject the null hypothesis and state that at least one of the estimators explains a statistically significant amount of the variation in the dependent variable.
+
+### Part E
+
+```{r}
+linearComboHypo <- linearHypothesis(olsEducLaborE, "labor_exprnc + educ = 2")
+```
+
+$\alpha = 0.05$  
+$H_o: \beta_1 + \beta_2 = 2$  
+$H_o: \beta_1 + \beta_2 \neq 2$  
+Degrees of freedom for the numerator: 2  
+Degrees of freedom for the denominator: `r nrow(dataWorking) - 3`  
+F-statistic of rejection: `r qf(0.95, df1 = 2, df2 = 2879)`  
+F-statistic: `r linearComboHypo$f[2]`
+
+We can reject the null hypothesis and state that at the $\alpha = 0.05$ confidence level we are confident the linear combination of the coefficients does not equal 2.
