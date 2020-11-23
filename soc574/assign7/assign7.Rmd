@@ -1,11 +1,9 @@
 ---
 title: "Assignment 7"
-output:
-  pdf_document: default
-  html_document: default
+output: pdf_document
 ---
 
-```{r}
+```{r, warning = F, message = F}
 library(car)
 library(here)
 library(dplyr)
@@ -17,7 +15,7 @@ library(ggplot2)
 * **educ**: Years of education for the household head.
 * **earnings**: Annual earnings for the household head in 1996.
 * **hours**: Annual hours worked for the household head in 1996.
-* *married*: Marriage indicator for household head.
+* **married**: Marriage indicator for household head.
     * 1 = married
     * 0 = not married
 
@@ -87,7 +85,7 @@ The estimate for $\beta_1$ is approximately 0.20998. It is significantly differe
 
 ### Part D
 
-The F-statistic for the model is 43 (with 1 and 2880 degrees of freedom). The critical value one should use to reject the null hypothesis at $\alpha = 0.05$ level of significance would be `r qf(0.95, df1 = 1, df2 = nrow(dataWorking))`. Thus we can reject the null hypothesis.
+The F-statistic for the model is 43 (with 1 and 2880 degrees of freedom). The critical value one should use to reject the null hypothesis at $\alpha = 0.05$ level of significance would be `r qf(0.95, df1 = 1, df2 = nrow(dataWorking) - 2)`. Thus we can reject the null hypothesis.
 
 ### Part E
 
@@ -155,7 +153,7 @@ Sum of Squared Residuals from Restricted Model (Model #1): `r ssrrLaborE`
 Sum of Squared Residuals from Unrestricted Model (Model #2): `r ssruEducLaborE`  
 F-statistic of rejection: `r qf(0.95, df1 = 2, df2 = 2879)`  
 F-statistic: `r fstatEduc`  
-t-statistic squared: `r summary(olsEducLaborE)[["coefficients"]][, "t value"][["educ"]] * 2`
+t-statistic squared: `r summary(olsEducLaborE)[["coefficients"]][, "t value"][["educ"]] ^ 2`
 
 We can therefore reject the null hypothesis and state that adding in the education variable statistically significantly increases the amount of variation explained in the dependent variable by the regression model.
 
@@ -185,6 +183,6 @@ $H_o: \beta_1 + \beta_2 \neq 2$
 Degrees of freedom for the numerator: 2  
 Degrees of freedom for the denominator: `r nrow(dataWorking) - 3`  
 F-statistic of rejection: `r qf(0.95, df1 = 2, df2 = 2879)`  
-F-statistic: `r linearComboHypo$f[2]`
+F-statistic: `r linearComboHypo$F[2]`
 
 We can reject the null hypothesis and state that at the $\alpha = 0.05$ confidence level we are confident the linear combination of the coefficients does not equal 2.
