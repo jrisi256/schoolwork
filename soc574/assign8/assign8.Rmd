@@ -138,4 +138,8 @@ Sex Gap in Log Earnings in 1985 (Men made this much more money than women): `r m
 
 ### Part G
 
-$\delta_2$ is the difference in mean log earnings for females in 1978 vs. 1985.
+$\delta_2$ is the difference in the sex gap between 1978 vs. 1985. We can show this algebraically.
+
+Sex gap in 1978: $\beta_0 - \beta_0 + \beta_5 = \beta_5$  
+Sex gap in 1985: $\beta_0 + \delta_0 - \beta_0 + \delta_0 + \beta_5 + \delta_2 = \beta_5 + \delta_2$  
+Meaning of $\delta_2$: $\beta_5 - \beta_5 + \delta_2 = \delta_2$ (Subtracting the sex gaps)
