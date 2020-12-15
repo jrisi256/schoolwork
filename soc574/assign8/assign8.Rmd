@@ -1,0 +1,141 @@
+---
+title: "Assignment 8"
+output: pdf_document
+---
+
+```{r, warning = F, message = F}
+library(here)
+```
+
+* **lwage**: Log of hourly wages.
+* **educ**: Years of schooling.
+* **exper**: Years of work experience (age - years of schooling - 6).
+* **expersq**: Years of work experience squared.
+* **union**: Is the individual part of a union? 1 if yes, 0 if not.
+* **female**: Is the individual female? 1 if yes 0 if not.
+* **y85**: Is the observation for the year 1985? 1 if yes, 0 if not.
+* **y85educ**: Years of education for observations in the year 1985, 0 if year of observation isn't 1985.
+* **y85fem**: Is the individual female and is the observation in 1985? 1 if yes, 0 if otherwise.
+
+```{r}
+data <- haven::read_dta(here("data", "CPS78_85.DTA"))
+```
+
+```{r}
+ols <- lm(lwage ~ educ + exper + expersq + union, data = data)
+summary <- summary(ols)
+summary
+```
+
+## Question 1
+
+### Part A
+
+Where we are estimating the following equation:
+
+$log(wage_{it}) = \beta_0 + \beta_1educ_{it} + \beta_2exper_{it} + \beta_3exper^2_{it} + \beta_4union_{it} + \epsilon_{it}$
+
+$H_0$: $\beta_3 \ge 0$  
+$H_a$: $\beta_3 < 0$  
+$T statistic$: `r summary[["coefficients"]]["expersq", "t value"]`
+
+This leads to a very small p-value which would lead to a rejection of the null hypothesis in almost all cases. This would mean we reject the null hypothesis that the returns of work experience to wages is the same for all years of work experience.
+
+### Part B
+
+The value of an additional year of experience for an individual with 2 years of experience on their log(wages):
+
+$\beta_2 + 2\beta_3(exper_{it})$ where experience is 2 years.  
+`r summary[["coefficients"]]["exper", "Estimate"] + 2 * summary[["coefficients"]]["expersq", "Estimate"] * 2`
+
+### Part C
+
+The value of an additional year of experience for an individual with 20 years of experience on their log(wages):
+
+$\beta_2 + 2\beta_3(exper_{it})$ where experience is 20 years.  
+`r summary[["coefficients"]]["exper", "Estimate"] + 2 * summary[["coefficients"]]["expersq", "Estimate"] * 20`
+
+## Question 2
+
+Where we are estimating the following equation:
+
+$log(wage_{it}) = \beta_0 + \delta_0y85_{it} + \beta_1educ_{it} + \delta_1y85_{it}*educ_{it} + \beta_2exper_{it} + \beta_3exper^2_{it} + \beta_4union_{it} + \beta_5female_{it} + \delta_2y85_{it}*female_{it} + \epsilon_{it}$
+
+```{r}
+ols2 <- lm(lwage ~ y85 + educ + y85educ + exper + expersq + union + female + y85fem, data = data)
+summ2 <- summary(ols2)
+summ2
+```
+
+### Part A
+
+$E(log(wage_{it}) | y85 = 0) = \beta_0$
+
+### Part B
+
+$E(log(wage_{it}) | y85 = 1) = \beta_0 + \delta_0$
+
+### Part C
+
+$\delta_0$ is the difference in the logged mean earnings between 1978 and 1985.
+
+### Part D
+
+$E(log(wage_{it})|educ_{it}, y85 = 0) =\beta_0 + \beta_1educ_{it}$
+
+### Part E
+
+$E(log(wage_{it})|educ_{it}, y85 = 1) =\beta_0 + \delta_0 + (\beta_1 + \delta1)educ_{it}$
+
+### Part F
+
+The difference in coefficients concerning the returns of education in 1978 vs. 1985 is $\delta_1$.
+
+$H_0$: $\delta_1 = 0$, there is no difference in the returns of education in 1978 vs. 1985  
+$H_a$: $\delta_1 \neq 0$, there is a difference in the returns of education in 1978 vs. 1985  
+T-statistic: `r summ2[["coefficients"]]["y85educ", "t value"]`  
+P-value: `r summ2[["coefficients"]]["y85educ", "Pr(>|t|)"]`
+
+At the 0.05 significance level, we could reject the null hypothesis and say the returns to education have changed between 1978 and 1985.
+
+### Part G
+
+$E(log(wages_{it}|female = 1, y85 = 0) = \beta_0 + \beta_5$  
+$E(log(wages_{it}|female = 0, y85 = 0) = \beta_0$
+
+```{r}
+meanFem1978 <-
+    summ2[["coefficients"]]["(Intercept)", "Estimate"] +
+    summ2[["coefficients"]]["female", "Estimate"]
+
+meanMale1978 <- summ2[["coefficients"]]["(Intercept)", "Estimate"]
+```
+
+Mean Female Log Earnings in 1978: `r meanFem1978`  
+Mean Male Log Earnings in 1978: `r meanMale1978`  
+Sex Gap in Log Earnings in 1978 (Men made this much more money than women): `r meanMale1978 - meanFem1978`
+
+### Part H
+
+$E(log(wages_{it}|female = 1, y85 = 1) = \beta_0 + \delta_0 + \beta_5 + \delta_2$  
+$E(log(wages_{it}|female = 0, y85 = 1) = \beta_0 + \delta_0$
+
+```{r}
+meanFem1985 <-
+    summ2[["coefficients"]]["(Intercept)", "Estimate"] +
+    summ2[["coefficients"]]["y85", "Estimate"] +
+    summ2[["coefficients"]]["female", "Estimate"] +
+    summ2[["coefficients"]]["y85fem", "Estimate"]
+    
+meanMale1985 <-
+    summ2[["coefficients"]]["(Intercept)", "Estimate"] +
+    summ2[["coefficients"]]["y85", "Estimate"]
+```
+
+Mean Female Log Earnings in 1985: `r meanFem1985`  
+Mean Male Log Earnings in 1985: `r meanMale1985`  
+Sex Gap in Log Earnings in 1985 (Men made this much more money than women): `r meanMale1985 - meanFem1985`
+
+### Part G
+
+$\delta_2$ is the difference in mean log earnings for females in 1978 vs. 1985.
