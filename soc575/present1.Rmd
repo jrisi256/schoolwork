@@ -1,0 +1,20 @@
+---
+title: 'Sarah & Joe Present: Does time spent doing homework in adolescence increasing reading and math achievement?'
+output: html_document
+---
+
+```{r}
+library(here)
+library(dplyr)
+library(tidyr)
+library(haven)
+library(forcats)
+library(ggplot2)
+library(stringr)
+library(sjlabelled)
+```
+
+```{r}
+data <- read_dta(here("class data.dta"))
+```
+
