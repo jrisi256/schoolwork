@@ -1,10 +1,13 @@
 ---
 title: 'Sarah & Joe Present: Does time spent doing homework in adolescence increasing reading and math achievement?'
-output: html_document
+output: pdf_document
 ---
 
-```{r}
+## Packages
+
+```{r, warning = F, message = F}
 library(here)
+library(purrr)
 library(dplyr)
 library(tidyr)
 library(haven)
@@ -12,9 +15,86 @@ library(forcats)
 library(ggplot2)
 library(stringr)
 library(sjlabelled)
+library(ggcorrplot)
 ```
+
+## Read in data and filter out all those who were not in the wave
 
 ```{r}
 data <- read_dta(here("class data.dta"))
+
+baseYearCohort <-
+    data %>%
+    select(matches("by|sex|race")) %>%
+    filter(byhomewk != 99)
 ```
 
+Number of students removed due to not being in the wave: `r nrow(data) - nrow(baseYearCohort)`  
+Fraction of total students removed: `r (nrow(data) - nrow(baseYearCohort)) / nrow(data)`
+
+## Get a sense for the data
+
+```{r}
+ggplot(baseYearCohort, aes(x = as_label(byhomewk))) +
+    geom_bar() +
+    theme_bw() +
+    coord_flip() +
+    labs(x = "Amount of time spent doing homework (hours)")
+
+ggplot(baseYearCohort, aes(x = as.numeric(by2xrirr))) +
+    geom_histogram(bins = 35, color = "red") +
+    labs(x = "Reading Test Scores") +
+    theme_bw()
+
+ggplot(baseYearCohort, aes(x = as.numeric(by2xmirr))) +
+    geom_histogram(bins = 35, color = "red") +
+    labs(x = "Math Test Scores") +
+    theme_bw()
+
+ggplot(baseYearCohort, aes(x = as_label(byhomewk), y = as.numeric(by2xrirr))) +
+    geom_boxplot() +
+    theme_bw() +
+    coord_flip() +
+    labs(x = "Amount of time doing homework (hours)", y = "Reading Test Scores")
+
+ggplot(baseYearCohort, aes(x = as_label(byhomewk), y = as.numeric(by2xmirr))) +
+    geom_boxplot() +
+    theme_bw() +
+    coord_flip() +
+    labs(x = "Amount of time doing homework (hours)", y = "Math Test Scores")
+
+ggplot(baseYearCohort, aes(x = as.numeric(by2xrirr), y = as.numeric(by2xmirr))) +
+    labs(x = "Reading Test Score", y = "Math Test Score") +
+    geom_point() +
+    theme_bw()
+
+cor(baseYearCohort$by2xrirr, baseYearCohort$by2xmirr, use = "complete.obs")
+```
+
+## Let's run some basic regressions
+
+```{r}
+baseYearCohortWide <-
+    baseYearCohort %>%
+    mutate(byhomewk_label = as_label(byhomewk),
+           byhomewk = as.numeric(as.logical(as.numeric(byhomewk)))) %>%
+    pivot_wider(names_from = byhomewk_label,
+                values_from = byhomewk,
+                values_fill = F)
+
+readingTestRegression <-
+    lm(by2xrirr ~ `.50 to 1.99 hours` + `2.00 to 2.99 hours` +
+           `3.00 to 5.49 hours` + `5.50 to 10.49 hours` +
+           `10.50 to 12.99 hours` + `13.00 to 20.99 hours` +
+           `21.00 and up hours`,
+       data = baseYearCohortWide)
+summary(readingTestRegression)
+
+mathTestRegression <-
+    lm(by2xmirr ~ `.50 to 1.99 hours` + `2.00 to 2.99 hours` +
+           `3.00 to 5.49 hours` + `5.50 to 10.49 hours` +
+           `10.50 to 12.99 hours` + `13.00 to 20.99 hours` +
+           `21.00 and up hours`,
+       data = baseYearCohortWide)
+summary(mathTestRegression)
+```
