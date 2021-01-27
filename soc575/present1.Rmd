@@ -121,15 +121,15 @@ CreateWideControls <- function(df, test) {
 RelocatePretty <- function(df) {
     df %>%
         relocate(".50.to.1.99.hours", "2.00.to.2.99.hours",
-                        "3.00.to.5.49.hours", "5.50.to.10.49.hours",
-                        "10.50.to.12.99.hours", "13.00.to.20.99.hours",
-                        "21.00.and.up.hours", "less.than..1.000",
-                        ".1.000....2.999", ".3.000....4.999", ".5.000....7.499",
-                        ".7.500....9.999", ".10.000..14.999", ".15.000..19.999",
-                         ".20.000..24.999", ".25.000..34.999", ".35.000..49.999",
-                        ".50.000..74.999", ".75.000..99.999", ".100.000.199.999",
-                        ".200.000.or.more", "..hs.....4yr.deg", "h.s..grad.or.ged",
-                        "college.graduate", "m.a..equivalent", "ph.d...m.d...other") %>%
+                 "3.00.to.5.49.hours", "5.50.to.10.49.hours",
+                 "10.50.to.12.99.hours", "13.00.to.20.99.hours",
+                 "21.00.and.up.hours", "less.than..1.000",
+                 ".1.000....2.999", ".3.000....4.999", ".5.000....7.499",
+                 ".7.500....9.999", ".10.000..14.999", ".15.000..19.999",
+                 ".20.000..24.999", ".25.000..34.999", ".35.000..49.999",
+                 ".50.000..74.999", ".75.000..99.999", ".100.000.199.999",
+                 ".200.000.or.more", "..hs.....4yr.deg", "h.s..grad.or.ged",
+                 "college.graduate", "m.a..equivalent", "ph.d...m.d...other") %>%
         select(-id, -black.not.hispanic, -male, -none, -didn.t.finish.hs, -`.0`)
 }
 
@@ -167,4 +167,102 @@ summary(readingTestRegressionControls)
 
 mathTestRegressionControls <- lm(by2xmirr ~ ., data = mathScoresWide)
 summary(mathTestRegressionControls)
+```
+
+## Let's recode by family income
+
+```{r}
+ggplot(baseYearCohort, aes(x = as_label(byfaminc))) +
+    geom_bar() +
+    theme_bw() +
+    coord_flip() +
+    labs(x = "Family Income")
+
+baseYearCohortRecode <-
+    baseYearCohort %>%
+    mutate(byfaminc = as.character(as_label(byfaminc)),
+           byfaminc = fct_recode(byfaminc,
+                                 "Less than $10,000" = "none",
+                                 "Less than $10,000" = "less than $1,000",
+                                 "Less than $10,000" = "$1,000 - $2,999",
+                                 "Less than $10,000" = "$3,000 - $4,999",
+                                 "Less than $10,000"= "$5,000 - $7,499",
+                                 "Less than $10,000" = "$7,500 - $9,999",
+                                 "$10,000 - $19,999" = "$10,000-$14,999",
+                                 "$10,000 - $19,999" = "$15,000-$19,999",
+                                 "$75,000 and above" = "$75,000-$99,999",
+                                 "$75,000 and above" = "$100,000-199,999",
+                                 "$75,000 and above" = "$200,000 or more"),
+           byfaminc = fct_relevel(byfaminc,
+                                  "Less than $10,000",
+                                  "$10,000 - $19,999",
+                                  "$20,000-$24,999",
+                                  "$25,000-$34,999",
+                                  "$35,000-$49,999",
+                                  "$50,000-$74,999",
+                                  "$75,000 and above"))
+
+ggplot(baseYearCohortRecode, aes(x = byfaminc)) +
+    geom_bar() +
+    theme_bw() +
+    coord_flip() +
+    labs(x = "Family Income")
+
+CreateWideControls <- function(df, test) {
+    df %>%
+        mutate(across(c(byhomewk, sex, race, bypared, byfaminc),
+                      list(label = compose(as.character, as_label))),
+               by2xrirr = as.numeric(by2xrirr),
+               by2xmirr = as.numeric(by2xmirr)) %>%
+        select(matches(paste0("label|^id$|", test))) %>%
+        filter(across(everything(), ~!is.na(.x))) %>%
+        mutate(byfaminc_label = if_else(byfaminc_label == "none",
+                                        "$0",
+                                        byfaminc_label)) %>%
+        mutate(across(c(byhomewk_label, sex_label, race_label, bypared_label,
+                        byfaminc_label),
+                      as.factor))
+}
+
+RelocatePrettyRecode <- function(df) {
+    df %>%
+        relocate(".50.to.1.99.hours", "2.00.to.2.99.hours",
+                 "3.00.to.5.49.hours", "5.50.to.10.49.hours",
+                 "10.50.to.12.99.hours", "13.00.to.20.99.hours",
+                 "21.00.and.up.hours", ".10.000....19.999", ".20.000..24.999",
+                 ".25.000..34.999", ".35.000..49.999", ".50.000..74.999",
+                 ".75.000.and.above", "..hs.....4yr.deg", "h.s..grad.or.ged",
+                 "college.graduate", "m.a..equivalent", "ph.d...m.d...other") %>%
+        select(-id, -black.not.hispanic, -male, -none, -didn.t.finish.hs,
+               -`Less.than..10.000`)
+}
+
+# Reading Scores
+readScoresWideRecode <-
+    CreateWideControls(baseYearCohortRecode, "by2xrirr") %>%
+    createDummyFeatures()
+    
+colnames(readScoresWideRecode) <- str_replace(colnames(readScoresWideRecode),
+                                        "by.*_label.|race_label.|sex_label.",
+                                        "")
+
+readScoresWideRecode <- RelocatePrettyRecode(readScoresWideRecode)
+
+readingTestRegressionControlsRecode <- lm(by2xrirr ~ .,
+                                          data = readScoresWideRecode)
+summary(readingTestRegressionControlsRecode)
+
+# Math Scores
+mathScoresWideRecode <-
+    CreateWideControls(baseYearCohortRecode, "by2xmirr") %>%
+    createDummyFeatures()
+    
+colnames(mathScoresWideRecode) <- str_replace(colnames(mathScoresWideRecode),
+                                        "by.*_label.|race_label.|sex_label.",
+                                        "")
+
+mathScoresWideRecode <- RelocatePrettyRecode(mathScoresWideRecode)
+
+mathTestRegressionControlsRecode <- lm(by2xmirr ~ ., data = mathScoresWideRecode)
+summary(mathTestRegressionControlsRecode)
 ```
