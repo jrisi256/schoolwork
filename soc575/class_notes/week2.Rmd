@@ -1,0 +1,61 @@
+---
+title: "Week 2"
+output: pdf_document
+---
+
+## Packages
+
+```{r}
+library(here)
+library(dplyr)
+library(purrr)
+library(haven)
+library(reghelper)
+library(sjlabelled)
+```
+
+## Data
+
+```{r}
+data <- read_dta(here("class data.dta"))
+filterData <- filter(data, !is.na(bypared), !is.na(bygrads), !is.na(bys42a))
+```
+
+## Correlational Matrix and Descriptive Statistics (naive since we're working wiith categorical variables)
+
+```{r}
+cor(dplyr::select(filterData, bygrads, bys42a, bypared), use = "complete.obs")
+map(dplyr::select(filterData, bygrads, bys42a, bypared), summary)
+```
+
+## Regression
+
+```{r}
+model <- lm(bygrads ~ bys42a + bypared, data = filterData)
+summary(model)
+
+# Standardizing coefficients
+
+# For every unit increase in x, you get a std. dev. increase in y
+beta(model, x = F)
+
+# For every std. dev. increase in x, you get "coefficient" increase in y
+beta(model, y = F)
+
+# For every std. dev. increase in x, you get std. dev. increase in y
+beta(model)
+```
+
+For predicting values, you plug in the values of interest and multiply by the coefficients and add the intercept. To hold a variable constant, you use the mean value of that variable.
+
+## Prediction
+
+```{r}
+newData <- tibble(bys42a = sort(unique(filterData$bys42a)),
+                  bypared = rep(mean(filterData$bypared), length(bys42a)))
+
+predict(model, newdata = newData,
+        se.fit = T,
+        interval = "confidence",
+        level = 0.95)
+```
