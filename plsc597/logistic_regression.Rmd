@@ -1,0 +1,150 @@
+---
+title: "Logistic Regression"
+output: pdf_document
+---
+
+## Packages
+
+```{r, message = F, warning = F}
+library(mlr)
+library(here)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+## Load data
+
+```{r}
+data(titanic_train, package = "titanic")
+titanicTib <- as_tibble(titanic_train)
+```
+
+* **Feature Extraction**: Predictive information is held in a variable but in a format that isn't useful.
+* **Feature Creation**: Existing variables are combined to create new ones.
+* **Feature Selection**: Selecting those features which will be used in modelling. Later we will get into more principled was of selecting features, but there are always some features which are common sense to include or remove.
+
+## Data Cleaning
+
+```{r}
+titanicClean <-
+    titanicTib %>%
+    mutate(across(c("Survived", "Sex", "Pclass"), factor)) %>%
+    mutate(FamSize = SibSp + Parch) %>%
+    select(Survived, Pclass, Sex, Age, Fare, FamSize)
+```
+
+## Plotting
+
+```{r}
+titanicUntidy <-
+    titanicClean %>%
+    pivot_longer(cols = -Survived,
+                 names_to = "Variable", 
+                 values_to = "Value",
+                 values_transform = list(Value = as.character))
+
+titanicUntidy %>%
+    filter(Variable != "Pclass" & Variable != "Sex") %>%
+    ggplot(aes(Survived, as.numeric(Value))) +
+    facet_wrap(~Variable, scales = "free_y") +
+    geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) +
+    geom_point(alpha = 0.05, size = 3) +
+    theme_bw()
+
+titanicUntidy %>%
+    filter(Variable == "Pclass" | Variable == "Sex") %>%
+    ggplot(aes(Value, fill = Survived)) +
+    facet_wrap(~Variable, scales = "free_x") +
+    geom_bar(position = "dodge") +
+    theme_bw()
+```
+
+## Deal with missing data
+
+We will use a method known as mean imputation. We take the mean of the variable with missing data and replace the missing values with that value.
+
+```{r}
+imp <- mlr::impute(titanicClean, cols = list(Age = imputeMean()))
+```
+
+## Using Cross-Validation to understand how well our model would generalize
+
+```{r, warning = F, message = F}
+# Create a task
+titanicTask <- makeClassifTask(data = imp$data, target = "Survived")
+
+# Cross-validate the entire model and all data-dependent pre-processing steps
+
+# Wrap together the learner and an imputation method
+logRegWrapper <- makeImputeWrapper("classif.logreg",
+                                   cols = list(Age = imputeMean()))
+
+# Let's apply stratified, 10-fold cross-validation, repeated 50 times
+# Stratification preserves the distribution of labels
+
+# RepCV is repeated cross-validation, define re-sampling method
+kFold <- makeResampleDesc(method = "RepCV", fold = 10, reps = 50, stratify = T)
+
+# Run the cross-validation
+logRegWithImpute <- resample(logRegWrapper,
+                             titanicTask,
+                             resampling = kFold,
+                             measures = list(acc, fpr, fnr))
+
+```
+
+## Train a model and interpret the coefficients.
+
+```{r}
+# Create a learner, specify the model and that you want probabilities output
+logReg <- makeLearner("classif.logreg", predict.type = "prob")
+
+# Train the model (separate from cross-validation procedure)
+logRegModel <- train(logReg, titanicTask)
+
+# Turn our trained model into an R object
+logRegModelData <- getLearnerModel(logRegModel)
+coef(logRegModelData)
+```
+
+The intercept is the log odds of surviving the Titanic disaster according to the model when all continuous variables are 0, and the factors are at their reference levels. All the coefficients are reported in log odd units as well. We want to convert them into odds ratios. We get from log odds to odds ratios by taking the exponent $e^{log.odds}$
+
+```{r}
+exp(cbind(Odds_Ratio = coef(logRegModelData), confint(logRegModelData)))
+```
+So then we can see most of these odds ratios are less than 1 (which means an event is less likely to occur). By dividing by 1, they become easier to interpret. So the odds ratio for surviving if you're male is 0.0622 roughly. If we divide by 1 or 1 / 0.0622 we get 16.07 which means holding all other variables constant men were 16.7 times less likely than women to survive.
+
+For continuous variables we use the language of unit increase. So holding all other variables constant, every additional family member made a passenger 1 / 0.784 or 1.28 times less likely to survive.
+
+When the odds-ratio is one it means the odds are equal and the variable has no predictive value. Notice the 95% confidence interval for Fare overlaps with 1 suggesting the Fare variable probably isn't contributing very much.
+
+Sometimes one-unit increases don't make a whole lot of sense. For example, let's say you get an odds ratio which says for every additional ant in an anthill, that anthill is 1.00005 times more likely to survive a termite attack. A popular technique to help make sense of this is to use $log_2$ to transform the continuous variables before training. It won't impact predictions, but it allows for an odds ratio interpretation which states that every time the number of ants doubles, the anthill is *x* times more likely to survive.
+
+## Let's make some predictions
+
+```{r}
+data(titanic_test, package = "titanic")
+titanicNew <- as_tibble(titanic_test)
+titanicNewClean <-
+    titanicNew %>%
+    mutate(across(c("Sex", "Pclass"), factor),
+           FamSize = SibSp + Parch) %>%
+    select(Pclass, Sex, Age, Fare, FamSize)
+
+predict(logRegModel, newdata = titanicNewClean)
+```
+
+## Strengths and Weaknesses
+
+Strengths:
+
+* It can handle categorical and continuous predictors.
+* The model parameters are very interpretable.
+* Predict variables aren't assumed to be normally distributed.
+
+Weaknesses:
+
+* It assumes a linear relationship between each predictor and the log odds. If there are cases for a given predictor where low and high values belong to one class but medium vales belong to another class, the linearity breaks down.
+* It assumes classes are linearly separable. It assumes a flat surface in n-dimensional space (n being the number of predictors) can separate the classes. If a curved surface is needed, logistic regression will under-perform.
+* Logistic regression runs into issues when there is some variable or set of variables which correctly 100% of the time predict group membership.
