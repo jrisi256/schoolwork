@@ -57,6 +57,7 @@
 #install.packages("MLmetrics")
 
 #call libraries
+library(here)
 library(readstata13)
 library(mlr)
 library(tidyverse)
@@ -67,7 +68,9 @@ library(MLmetrics)
 
 # Import data. I use read.dta13 because I already had it as a Stata .dta file
 # update the file path to wherever the data are stored on your machine.
-data <- read.dta13("CSAF1_2014.dta")
+data <- read.dta13(here("class_presentations",
+                        "2021-02-02_Logistic-Regression_Chris-Seto",
+                        "CSAF1_2014.DTA"))
 
 #make the data into a tibble for easier viewing and manipulation
 data_tib <- as_tibble(data)
