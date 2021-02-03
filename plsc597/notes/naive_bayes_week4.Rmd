@@ -1,0 +1,87 @@
+---
+title: "Naive Bayes"
+output: html_document
+---
+
+Your goal is to predict whether or not a given representative in the House of Representatives in 1984 is a Democrat or a Republican based on their voting record on 16 key votes.
+
+## Packages
+
+```{r}
+library(mlr)
+library(tidyverse)
+```
+
+## Load Data
+
+```{r}
+data(HouseVotes84, package = "mlbench")
+votesTib <- as_tibble(HouseVotes84)
+
+# Check out the number of missing values for each column
+missings <- map_dbl(votesTib, ~sum(is.na(.)))
+```
+
+Naive Bayes deals with missing values by:
+
+* omitting those variables which are missing for each case.
+* omitting that case entirely.
+
+## Plots
+
+```{r}
+votesUntidy <-
+    votesTib %>%
+    pivot_longer(-Class, names_to = "Variable", values_to = "Value")
+
+ggplot(votesUntidy, aes(Class, fill = Value)) +
+    facet_wrap(~ Variable, scales = "free_y") +
+    geom_bar(position = "fill") +
+    theme_bw()
+```
+
+## Create the task, learner, and model
+
+```{r}
+votesTask <- makeClassifTask(data = votesTib, target = "Class")
+bayes <- makeLearner("classif.naiveBayes") #, predict.type = "prob") -> allows for probabilities to be returned
+bayes <- makeLearner("classif.naiveBayes", predict.type = "prob")
+bayesModel <- train(bayes, votesTask)
+```
+
+## 10-fold cross-validation repeated 50 times
+
+```{r, warning = F, message = F}
+kFold <- makeResampleDesc(method = "RepCV", folds = 10, reps = 50, stratify = T)
+bayesCV <- resample(learner = bayes,
+                    task = votesTask,
+                    resampling = kFold,
+                    measures = list(mmce, acc, fpr, fnr))
+
+# Performance is pretty good! 90% accuracy
+bayesCV$aggr
+```
+
+## Predict a new politician's party based on their vote record
+
+```{r}
+politician <-
+    tibble(V1 = "n", V2 = "n", V3 = "y", V4 = "n", V5 = "n", V6 = "y",
+           V7 = "y", V8 = "y", V9 = "y", V10 = "y", V11 = "n", V12 = "y",
+           V13 = "n", V14 = "n", V15 = "y", V16 = "n")
+
+politicianPred <- predict(bayesModel, newdata = politician)
+
+# Model predicts they would be a Democrat
+politicianPred$data$response
+```
+
+## Examining the features
+
+To see the *importance* of the various features, you would simply investigate the probabilities of each political party member voting for a specific bill.
+
+```{r}
+features <- bayesModel$learner.model$tables
+features
+```
+
