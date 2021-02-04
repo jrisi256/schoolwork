@@ -3,3 +3,108 @@ title: "Support Vector Machines"
 output: html_document
 ---
 
+## Packages
+
+```{r, message = F, warning = F}
+library(mlr)
+library(parallel)
+library(tidyverse)
+library(parallelMap)
+```
+
+## Load the data
+
+```{r}
+data(spam, package = "kernlab")
+spamTib <- as_tibble(spam)
+```
+
+## Create the task and learner
+
+```{r}
+spamTask <- makeClassifTask(data = spamTib, target = "type")
+svm <- makeLearner("classif.svm")
+```
+
+## We need to tune the hyperparameters to train our model
+
+* **Type** is whether the hyperparameter takes numeric, integer, discrete, or logical values.
+* **Def** is the default value.
+* **Constr** defines the constraints of the hyperparameter. It'll be either a set of specific values or a range of acceptable values.
+* **Req**: Is the hyperparameter required for the algorithm?
+* **Tunable**: Can the hyperparameter be tuned? Some algorithms have options which cannot be tuned but can be set by the user.
+
+The scale hyperparameter is important because SVMs are sensitive to variables being on different scales. By default, the values are scaled for us.
+
+How do we search the hyperparameter space?
+
+* One approach is to use grid search which systematically tries every value. This is comprehensive, but when you are tuning many values for many hyperparameters this very quickly becomes computationally impossible.
+* Another approach is one called random search. Not guaranteed to find best values. **Can do we do this search more intelligently?**
+    * Randomly select a combination of hyperparameter values.
+    * Use cross-validation to train and evaluate a model using those hyperparameter values.
+    * Record the performance metric.
+    * Repeat the above 3 steps.
+    * Select the combination of hyperparameters which gives the best performance.
+    
+**Question: How can we interpret the weights of the different variables? Where do we even find them?**
+
+```{r}
+# Examine all possible hyperparameters
+getParamSet("classif.svm")
+
+# Tuning our hyperparameters
+# We define the set or range of values we want to tune over
+kernels <- c("polynomial", "radial", "sigmoid")
+svmParamSpace <- makeParamSet(
+    makeDiscreteParam("kernel", values = kernels),
+    makeIntegerParam("degree", lower = 1, upper = 3),
+    makeNumericParam("cost", lower = 0.1, upper = 10),
+    makeNumericParam("gamma", lower = 0.1, upper = 10))
+
+# Define the random search
+randSearch <- makeTuneControlRandom(maxit = 20)
+
+# Simple holdout cross-validation since this will be computationally intensive
+cvForTuning <- makeResampleDesc("Holdout", split = 2/3)
+
+# Cross-validate the model in parallel
+parallelStartSocket(cpus = detectCores() - 1)
+
+# Arg 1: The learning algorithm
+# Arg 2: Task, pass in our task
+# Arg 3: resampling, pass in our cross-validation procedure
+# Arg 4: par.set, hyperparameter space we are searching
+# Arg 5: control, search procedure
+tunedSvmPars <- tuneParams("classif.svm",
+                           task = spamTask,
+                           resampling = cvForTuning,
+                           par.set = svmParamSpace,
+                           control = randSearch)
+
+parallelStop() # stop running code in parallel
+
+# Train our model with the tuned hyperparameters
+tunedSvm <- setHyperPars(svm, par.vals = tunedSvmPars$x)
+tunedSvmModel <- train(tunedSvm, spamTask)
+```
+
+## Cross-validate our model to get a sense of its performance with optimal hyperparameters
+
+Remember to include all data-dependent steps within the model-building process. Not including these steps will lead to an overly optimistic estimate of model performance.
+
+```{r}
+# Wrap together our hyperparameter tuning and learner
+svmWrapper <- makeTuneWrapper(svm,
+                              resampling = cvForTuning,
+                              par.set = svmParamSpace,
+                              control = randSearch)
+
+# 3-fold Cross validation (only 1 time, not repeating)
+outer <- makeResampleDesc("CV", iters = 3)
+
+# Run cross-validation in parallel, testing how do we "out-of-sample"
+# Not bad accuracy!
+parallelStartSocket(cpus = detectCores() - 1)
+cvWithTuning <- resample(svmWrapper, spamTask, resampling = outer)
+parallelStop()
+```
