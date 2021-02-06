@@ -205,4 +205,12 @@ influenceDf <-
 ggplot(influenceDf, aes(x = stdResidualSq, y = leverage)) +
     geom_point() +
     theme_bw()
+
+# Regression without those values, doesn't change much
+filterDataMatchNoOutliers <-
+    influenceDfBroom %>%
+    filter(!(id %in% c(10547, 4619, 4812)))
+
+summary(model)
+summary(lm(bygrads ~ by2xmirr, data = filterDataMatchNoOutliers))
 ```
