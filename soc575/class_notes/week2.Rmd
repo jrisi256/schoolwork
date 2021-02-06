@@ -5,7 +5,7 @@ output: pdf_document
 
 ## Packages
 
-```{r}
+```{r, warning = F, message = F}
 library(here)
 library(dplyr)
 library(purrr)
@@ -47,6 +47,8 @@ beta(model)
 ```
 
 For predicting values, you plug in the values of interest and multiply by the coefficients and add the intercept. To hold a variable constant, you use the mean value of that variable.
+
+So below, we're getting the expected values of your GPA for each value of TV watching while holding parents' education constant.
 
 ## Prediction
 

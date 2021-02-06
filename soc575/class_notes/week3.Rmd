@@ -1,0 +1,208 @@
+---
+title: "Week 3"
+output: html_document
+---
+
+```{r, warning = F, message = F}
+library(car)
+library(here)
+library(dplyr)
+library(broom)
+library(ggplot2)
+library(ggfortify)
+library(reghelper)
+library(sjlabelled)
+```
+
+## Data
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+filterDataMath <- filter(data, !is.na(bygrads), !is.na(by2xmirr))
+filterDataSci <- filter(data, !is.na(bygrads), !is.na(by2xsirr))
+```
+
+## Standardize variables (Subtract the mean and divide by the standard deviation)
+
+This can be a useful way to compare coefficients in a regression in a *standardized* way. A standard deviation change in $x_1$ would produce a greater change (standard deviation or otherwise) in $y$ vs. $x_2$.
+
+```{r}
+col1 <- c(1,2,3,4,5,2,1,2,4)
+mean <- mean(col1)
+sd <- sd(col1)
+scaledCol1 <- (col1 - mean) / sd
+scaled2Col1 <- scale(col1)
+```
+
+## Is the effect of math scores on GPA nonlinear?
+
+```{r}
+# Add a square term
+filterDataMath <-
+    filterDataMath %>%
+    mutate(mathsquared = as.numeric(by2xmirr ^ 2),
+           mathcubed = as.numeric(by2xmirr ^ 3),
+           bygrads = as.numeric(bygrads),
+           by2xmirr = as.numeric(by2xmirr))
+
+# Assume the effect is linear implicitly
+model <- lm(bygrads ~ by2xmirr, data = filterDataMath)
+summary(model)
+
+# Slight curve to our data, diminishing returns of higher math scores
+model2 <- lm(bygrads ~ by2xmirr + mathsquared, data = filterDataMath)
+summary(model2)
+
+model3 <- lm(bygrads ~ by2xmirr + mathsquared + mathcubed, data = filterDataMath)
+summary(model3)
+
+# Do the new variables significantly change the amount of variation explained?
+anova(model, model2) # adding math squared seems to be significant
+anova(model2, model3) # adding math cubed does NOT seem to be significant
+```
+
+## Hard to visualize and explain what the math squared variable means
+
+```{r}
+newDataMath <-
+    tibble(by2xmirr = quantile(filterDataMath$by2xmirr, probs = seq(0, 1, 0.1)),
+           mathsquared = by2xmirr ^ 2)
+
+predictMath <- predict(model2, newdata = newDataMath,
+                       se.fit = T,
+                       interval = "confidence",
+                       level = 0.95)
+
+graphPredictionsMath <-
+    newDataMath %>%
+    bind_cols(as_tibble(predictMath$fit))
+
+# Baby curve!
+ggplot(filterDataMath, aes(x = as.numeric(by2xmirr), y = as.numeric(bygrads))) +
+    geom_point(data = graphPredictionsMath, aes(x = by2xmirr, y = fit)) +
+    geom_errorbar(data = graphPredictionsMath,
+                  aes(x = by2xmirr, ymin = lwr, ymax = upr),
+                  inherit.aes = F) +
+    geom_smooth(method = "lm", se = F, formula = y ~ x + I(x^2)) +
+    theme_bw()
+```
+
+## Now let's do this again for the sciene variable
+
+```{r}
+filterDataSci <- filterDataSci %>% mutate(sciencesquared = by2xsirr ^ 2)
+
+modelSci1 <- lm(bygrads ~ by2xsirr, data = filterDataSci)
+modelSci2 <- lm(bygrads ~ by2xsirr + sciencesquared, data = filterDataSci)
+
+summary(modelSci1)
+summary(modelSci2)
+anova(modelSci1, modelSci2)
+
+newDataSci <-
+    tibble(by2xsirr = quantile(filterDataSci$by2xsirr, probs = seq(0, 1, 0.1)),
+           sciencesquared = by2xsirr ^ 2)
+
+predictSci <- predict(modelSci2, newdata = newDataSci,
+                      se.fit = T,
+                      interval = "confidence",
+                      level = 0.95)
+
+graphPredictionsSci <-
+    newDataSci %>%
+    bind_cols(as_tibble(predictSci$fit))
+
+ggplot(filterDataSci, aes(x = as.numeric(by2xsirr), y = as.numeric(bygrads))) +
+    geom_point(data = graphPredictionsSci, aes(x = by2xsirr, y = fit)) +
+    geom_errorbar(data = graphPredictionsSci,
+                  aes(x = by2xsirr, ymin = lwr, ymax = upr),
+                  inherit.aes = F) +
+    geom_smooth(method = "lm", se = F, formula = y ~ x + I(x^2)) +
+    theme_bw()
+```
+
+## Do math scores predict income as adults?
+
+Slightly different results from the slides because I'm not getting rid of outliers.
+
+```{r}
+filterDataIncome <-
+    data %>%
+    filter(f4hi99 != 0, !is.na(f4hi99)) %>%
+    mutate(lnIncome = log(f4hi99))
+
+# For each std. deviation increase in math score, income at age 26 expected to
+# increase by 100(exp(beta) - 1)%.
+modelIncomeStd <- beta(lm(by2xmirr ~ lnIncome, data = filterDataIncome))
+modelIncomeStd
+```
+
+To check for multicollinearity:
+
+* Check correlation matrix for *high* values (a little subjective).
+* Perform VIF test (Variance Inflation Factor).
+    * How inflated is your variance because your variables are too collinear?
+    * VIF of 1.8 = variance of coefficient is 80% higher compared to estimate that is uncorrelated with other predictors. (1.8 - 1) * 100%
+
+## Math and science scores, too correlated? Pretty correlated, but not terribly so
+
+```{r}
+# Correlation matrix
+cor(select(data, bygrads, by2xmirr, by2xsirr), use = "complete.obs")
+
+# VIF
+mathScienceModel <- lm(bygrads ~ by2xmirr + by2xsirr, data = data)
+summary(mathScienceModel)
+car::vif(mathScienceModel)
+```
+
+## Math, science, and reading scores, too correlated? Too correlated.
+
+```{r}
+# Correlation matrix
+cor(select(data, bygrads, by2xmirr, by2xsirr, by2xrirr), use = "complete.obs")
+
+# VIF
+mathScienceReadingModel <- lm(bygrads ~ by2xmirr + by2xsirr + by2xrirr, data = data)
+summary(mathScienceReadingModel)
+vif(mathScienceReadingModel)
+```
+
+## Dealing with Unusual Values
+
+* Large residuals (outliers) -> observation where Y value is unusual given its X value.
+* Leverage (Extreme values on X) -> how far an observation deviates from the mean of that variable.
+* Important for small samples.
+
+```{r}
+ggplot2::autoplot(model)[4] + coord_flip() + theme_bw()
+
+# Leverage vs. residual, broom way
+influenceDfBroom <-
+    broom::augment(model) %>%
+    mutate(id = row_number(),
+           stdResidualSq = .std.resid ^ 2)
+
+ggplot(influenceDfBroom, aes(x = stdResidualSq, y = .hat)) +
+    geom_point() +
+    geom_line(aes(x = .cooksd, y = .hat), color = "red") +
+    theme_bw() +
+    geom_text(aes(label = id))
+
+influentialValues <-
+    influenceDfBroom %>%
+    filter(id %in% c(10547, 4619, 4812))
+
+# Leverage vs. residual, cumbersome way
+influenceDf <-
+    tibble(leverage = lm.influence(model)$hat,
+           residual = model$residuals,
+           meanSquareError = sum(residual ^ 2) / length(residual),
+           stdResidual = residual / sqrt(meanSquareError * (1 - leverage)),
+           stdResidualSq = stdResidual ^ 2) %>%
+    mutate(id = row_number())
+
+ggplot(influenceDf, aes(x = stdResidualSq, y = leverage)) +
+    geom_point() +
+    theme_bw()
+```
