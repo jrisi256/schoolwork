@@ -1,0 +1,64 @@
+---
+title: "Week 4"
+output: html_document
+---
+
+```{r, warning = F, message = F}
+library(here)
+library(dplyr)
+library(haven)
+library(ggplot2)
+library(forc)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+noMissing <-
+    data %>%
+    select(f2evdost, bypared, by2xrirr, bys43) %>%
+    filter(across(everything(), ~!is.na(.x)))
+```
+
+There's a lot you can do with the smoking variable. You can treat them as dummy variables. You can re-code it to be binary. It may not make the most sense to be treating it as a continuous, numeric variable.
+
+```{r}
+model <- lm(f2evdost ~ bypared + by2xrirr + bys43, data = noMissing)
+summary(model)
+
+newData <-
+    tibble(bys43 = unique(noMissing$bys43),
+           bypared = rep(mean(noMissing$bypared), length(unique(noMissing$bys43))),
+           by2xrirr = rep(mean(noMissing$by2xrirr), length(unique(noMissing$bys43))))
+
+predict <-
+    predict(model,
+            newdata = newData,
+            se.fit = T,
+            interval = "confidence",
+            level = 0.95)
+
+graphPredictions <-
+    newData %>%
+    bind_cols(as_tibble(predict$fit))
+
+ggplot(noMissing, aes(x = bys43, y = f2evdost)) +
+    geom_point(data = graphPredictions, aes(x = bys43, y = fit)) +
+    geom_errorbar(data = graphPredictions,
+                  aes(x = bys43, ymin = lwr, ymax = upr),
+                  inherit.aes = F) +
+    #geom_line(aes(x = bys43, y = fit), data = graphPredictions, inherit.aes = F) + 
+    geom_smooth(data = graphPredictions,
+                aes(x = bys43, y = fit),
+                method = "lm",
+                se = F,
+                formula = y ~ x,
+                inherit.aes = F) +
+    scale_x_continuous(label = c("i don^t smoke",
+                               "1-5 cigarettes",
+                               "about 1/2 pack",
+                               "mt 1/2,lt 2 packs",
+                               "2 packs or more"),
+                       breaks = c(0, 1, 2, 3, 4)) +
+    theme_bw()
+```
