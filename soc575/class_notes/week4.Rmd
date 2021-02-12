@@ -6,9 +6,11 @@ output: html_document
 ```{r, warning = F, message = F}
 library(here)
 library(dplyr)
+library(purrr)
 library(haven)
 library(ggplot2)
-library(forc)
+library(forcats)
+library(reghelper)
 library(sjlabelled)
 ```
 
@@ -62,3 +64,35 @@ ggplot(noMissing, aes(x = bys43, y = f2evdost)) +
                        breaks = c(0, 1, 2, 3, 4)) +
     theme_bw()
 ```
+
+## Logistic Regression
+
+```{r}
+logitModel <- glm(f2evdost ~ by2xrirr + bypared + bygrads + byfaminc + bys55f +
+                      bys45 + bys53,
+                  data = data,
+                  family = "binomial")
+summary(logitModel)
+
+# Odds Ratios, for a unit increase in reading test scores, the odds of dropout
+# are expected to decrease by a factor of 0.975 holding all other variables
+# constant.
+
+# For a unit increase in reading test scores, the odds of dropout decrease by
+# 2.5% holding all other variables constant.
+exp(coef(logitModel))
+
+# Standardize the independent variables
+# For a std. dev. increase in reading test scores, the odds of dropout
+# decrease by about 20%.
+exp(coef(beta(logitModel, y = F)))
+
+noMissingLogit <-
+    data %>%
+    select(f2evdost, by2xrirr, bypared, bygrads, byfaminc, bys55f, bys45, bys53) %>%
+    filter(across(everything(), ~!is.na(.x)))
+
+# standard deviations
+map(noMissingLogit, sd)
+```
+
