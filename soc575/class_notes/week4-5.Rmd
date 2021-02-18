@@ -1,5 +1,5 @@
 ---
-title: "Week 4"
+title: "Weeks 4 and 5"
 output: html_document
 ---
 
@@ -81,6 +81,7 @@ summary(logitModel)
 # For a unit increase in reading test scores, the odds of dropout decrease by
 # 2.5% holding all other variables constant.
 exp(coef(logitModel))
+paste0(100 * (exp(coef(logitModel)) - 1), "%")
 
 # Standardize the independent variables
 # For a std. dev. increase in reading test scores, the odds of dropout
@@ -96,3 +97,74 @@ noMissingLogit <-
 map(noMissingLogit, sd)
 ```
 
+## Predicted Probabilities
+
+```{r}
+# Automatically (sort of)
+predictDf <- noMissingLogit %>% select(-f2evdost)
+predictions <- as_tibble(predict(logitModel,
+                                 newdata = predictDf,
+                                 type = "response"))
+ggplot(predictions, aes(x = value)) + geom_histogram(bins = 35) + theme_bw()
+```
+
+For the average student you would do:
+~!is.na(.x)
+* Add expected natural log = intercept + logit coef_1 * mean_1 + logit_coef_2 * mean_2 + ...
+* Expected probability = exp(expected natural log) / (1 + exp(expected natural log))
+* Average student has "expected probability" chance of dropping out.
+* For a series of dummy variables, if you want to find the predicted probability of one of those variables while holding everything else constant, you would set that dummy variable of interest to 1 while the others would be set to 0 NOT the mean.
+
+```{r}
+predictAverageDf <-
+    tibble(by2xrirr = mean(noMissingLogit$by2xrirr),
+           bypared = mean(noMissingLogit$bypared),
+           bygrads = mean(noMissingLogit$bygrads),
+           byfaminc = mean(noMissingLogit$byfaminc),
+           bys55f = mean(noMissingLogit$bys55f),
+           bys45 = mean(noMissingLogit$bys45),
+           bys53 = mean(noMissingLogit$bys53))
+
+predictionAverage <- as_tibble(predict(logitModel,
+                                       newdata = predictAverageDf,
+                                       type = "response",
+                                       se.fit = T))
+```
+
+## In class exercise on voting
+
+```{r}
+# Missing
+dataNoMissingVoting <-
+    data %>%
+    select(f4ivpre, f4hhdg, f4aempl, f2s30bc) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    filter(f2s30bc != 1)
+
+# Logit
+logitModelVoting <- glm(f4ivpre ~ f4hhdg + f4aempl + f2s30bc,
+                        data = dataNoMissingVoting,
+                        family = "binomial")
+summary(logitModelVoting)
+
+# Linear
+linearModelVoting <- lm(f4ivpre ~ f4hhdg + f4aempl + f2s30bc,
+                        data = dataNoMissingVoting)
+summary(linearModelVoting)
+
+# Predictions
+predictDf <- dataNoMissingVoting %>% select(-f4ivpre)
+predictionsLogit <- as_tibble(predict(logitModelVoting,
+                                      newdata = predictDf,
+                                      type = "response"))
+predictionsOls <- as_tibble(predict(linearModelVoting,
+                                    newdata = predictDf))
+
+ggplot(predictionsLogit, aes(x = value)) +
+    geom_histogram(bins = 35) +
+    theme_bw()
+
+ggplot(predictionsOls, aes(x = value)) +
+    geom_histogram(bins = 35) +
+    theme_bw()
+```
