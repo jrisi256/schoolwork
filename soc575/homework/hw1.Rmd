@@ -1,0 +1,192 @@
+---
+title: 'Homework #1 - Joe Risi'
+output: pdf_document
+---
+
+## Packages
+
+```{r, message = F, warning = F, echo = F}
+library(mlr)
+library(here)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(haven)
+library(ggplot2)
+library(forcats)
+library(stringr)
+library(reghelper)
+library(sjlabelled)
+```
+
+```{r, echo = F}
+data <- haven::read_dta(here("class data.dta"))
+
+# Filter out missings, recode family income, make dummy variables
+dataClean <-
+    data %>%
+    select(bys45, byfaminc, sex, bygrads) %>%
+    filter(across(everything(), ~!is.na(.x)))
+
+dataWide <-
+    dataClean %>%
+    mutate(byfaminc = as_character(byfaminc),
+           byfaminc = fct_recode(byfaminc,
+                                 "Less than $10,000" = "none",
+                                 "Less than $10,000" = "less than $1,000",
+                                 "Less than $10,000" = "$1,000 - $2,999",
+                                 "Less than $10,000" = "$3,000 - $4,999",
+                                 "Less than $10,000"= "$5,000 - $7,499",
+                                 "Less than $10,000" = "$7,500 - $9,999",
+                                 "$10,000 - $19,999" = "$10,000-$14,999",
+                                 "$10,000 - $19,999" = "$15,000-$19,999",
+                                 "$75,000 and above" = "$75,000-$99,999",
+                                 "$75,000 and above" = "$100,000-199,999",
+                                 "$75,000 and above" = "$200,000 or more"),
+           byfaminc = fct_relevel(byfaminc,
+                                  "Less than $10,000",
+                                  "$10,000 - $19,999",
+                                  "$20,000-$24,999",
+                                  "$25,000-$34,999",
+                                  "$35,000-$49,999",
+                                  "$50,000-$74,999",
+                                  "$75,000 and above"),
+           bys45 = as.factor(as_character(bys45)),
+           sex = as.factor(as_character(sex)),
+           bygrads = as.numeric(bygrads)) %>%
+        createDummyFeatures()
+
+colnames(dataWide) <-
+    str_replace(colnames(dataWide), "bys45.|byfaminc\\.{1,2}|sex.", "")
+
+# Rearrange columns and drop reference categories
+dataWide <-
+    dataWide %>%
+    relocate("won.t.finish.h.s", "will.finish.h.s", "voc.trd.bus.aftr.h.s",
+             "will.attend.college", "will.finish.college") %>%
+    select(-female, -higher.sch.aftr.coll, -`75.000.and.above`)
+```
+
+## Question 1
+
+1. I filter out all missing observations. I go from `r nrow(data)` records to `r nrow(dataClean)` records.
+2. Recode family income into roughly equal sizes. The new categories are as follows:
+    * 0 - 9,999
+    * 10,000 - 19,999
+    * 20,000 - 24,999
+    * 25,000 - 34,999
+    * 35,000 - 49,999
+    * 50,000 - 74,999
+    * 75,000 and above
+3. I turn sex, byfaminc, and bys45 into dummy variables.
+4. I drop the following categories which will serve as the reference categories for the regression:
+    * female (sex)
+    * 75,000 and above (byfaminc)
+    * higher.sch.aftr.coll (bys45)
+
+```{r, echo = F}
+# Run regressions
+linearModel <- lm(bygrads ~ ., data = dataWide)
+summary(linearModel)
+```
+
+* All results are significant at the 0.05 level. All except one ($50,000 - %74,999) are significant at the 0.001 level.
+* Relative to females while holding all other variables in the model constant, being male decreases one's GPA by about 0.1 points, on average.
+* Relative to those students who come from families making more $75,000 or more each year while holding all other variables in the model constant:
+    * Coming from a family making less than $10,000 decreases your GPA by 0.34418 points on average.
+    * Coming from a family making between \$10,000 - \$19,999 decreases your GPA by 0.22947 points on average.
+    * Coming from a family making between \$20,000 - \$24,999 decreases your GPA by 0.16325 points on average.
+    * Coming from a family making between \$25,000 - \$34,999 decreases your GPA by 0.15089 points on average.
+    * Coming from a family making between \$35,000 - \$49,999 decreases your GPA by 0.10332 points on average.
+    * Coming from a family making between \$50,000 - \$74,999 decreases your GPA by 0.06352 points on average.
+* Relative to those students who have expectations of going beyond their college education while holding all other variables in the model constant:
+    * Having expectations of not finishing high school decreases your GPA by 1.17818 points on average.
+    * Having expectations of just finishing high school decreases your GPA by 0.92871 points on average.
+    * Having expectations of going to vocational/trade school decreases your GPA by 0.65136 points on average.
+    * Having expectations of attending college decreases your GPA by 0.60532 points on average.
+    * Having expectations of finishing college decreases your GPA by 0.24041 points on average.
+
+```{r, echo = F}
+beta(linearModel, x = F)
+```
+
+The above results represent **y-standardized** coefficients. It does not make sense to standardize my independent variables because they are all dummy variables. It's hard to interpret what a standard deviation in a dummy variable would mean.
+
+* All results are significant at the 0.05 level. All except one ($50,000 - %74,999) are significant at the 0.001 level.
+* Relative to females while holding all other variables in the model constant, being male decreases one's GPA by about 0.13942 standard deviations on average.
+* Relative to those students who come from families making more $75,000 or more each year while holding all other variables in the model constant:
+    * Coming from a family making less than $10,000 decreases your GPA by 0.47093 standard deviations.
+    * Coming from a family making between \$10,000 - \$19,999 decreases your GPA by 0.31397 standard deviations on average.
+    * Coming from a family making between \$20,000 - \$24,999 decreases your GPA by 0.22336 standard deviations on average.
+    * Coming from a family making between \$25,000 - \$34,999 decreases your GPA by 0.20646 standard deviations on average.
+    * Coming from a family making between \$35,000 - \$49,999 decreases your GPA by 0.14137 standard deviations on average.
+    * Coming from a family making between \$50,000 - \$74,999 decreases your GPA by 0.08691 standard deviations on average.
+* Relative to those students who have expectations of going beyond their college education while holding all other variables in the model constant:
+    * Having expectations of not finishing high school decreases your GPA by 1.61205 standard deviations on average.
+    * Having expectations of just finishing high school decreases your GPA by 1.27070 standard deviations on average.
+    * Having expectations of going to vocational/trade school decreases your GPA by 0.89122 standard deviations on average.
+    * Having expectations of attending college decreases your GPA by 0.82823 standard deviations on average.
+    * Having expectations of finishing college decreases your GPA by 0.32894 standard deviations on average.
+    
+```{r, echo = F}
+predict <- tibble(won.t.finish.h.s = c(1, 0, 0, 0, 0),
+                  will.finish.h.s = c(0, 1, 0, 0, 0),
+                  voc.trd.bus.aftr.h.s = c(0, 0, 1, 0, 0),
+                  will.attend.college = c(0, 0, 0, 1, 0),
+                  will.finish.college = c(0, 0, 0, 0, 1),
+                  Less.than..10.000 = c(0, 0, 0, 0, 0),
+                  `10.000....19.999` = c(0, 0, 0, 0, 0),
+                  `20.000..24.999` = c(0, 0, 0, 0, 0),
+                  `25.000..34.999` = c(0, 0, 0, 0, 0),
+                  `35.000..49.999` = c(1, 1, 1, 1, 1),
+                  `50.000..74.999` = c(0, 0, 0, 0, 0),
+                  `male` = c(0, 0, 0, 0, 0))
+
+predictions <-
+    as_tibble(predict(linearModel,
+                      newdata = predict,
+                      se.fit = T,
+                      interval = "confidence",
+                      level = 0.95)$fit) %>%
+    bind_cols(predict) %>%
+    pivot_longer(cols = matches("will|college|won|voc"),
+                 names_to = "educational_expectations",
+                 values_to = "values") %>%
+    filter(values == 1) %>%
+    select(-values) %>%
+    mutate(educational_expectations = fct_relevel(educational_expectations,
+                                                  "won.t.finish.h.s",
+                                                  "will.finish.h.s",
+                                                  "voc.trd.bus.aftr.h.s",
+                                                  "will.attend.college",
+                                                  "will.finish.college" ))
+
+ggplot(predictions, aes(x = educational_expectations, y = fit)) +
+    geom_point() +
+    geom_errorbar(aes(ymin = lwr, ymax = upr)) +
+    geom_line(group = 1) + 
+    theme_bw() +
+    labs(x = "Educational Expectations",
+         y = "Expected GPA",
+         title = "Expected value of GPA, holding family income and gender constant")
+```
+
+Because I used categorical variables for everything in my model, I had to set family income and sex equal to their modal values (\$35,000 - \$49,999 and female) to hold them constant.
+
+## Question 2
+
+```{r}
+dataClean2 <-
+    data %>% 
+    select(f4hhdg, f4hi99, f4gmrs) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    filter(f4hi99 != 0) %>%
+    mutate(f4hhdg_squared = f4hhdg ^ 2)
+
+linearModel2 <- lm(f4hi99 ~ f4hhdg, data = dataClean2)
+linearModel2_squared <- lm(f4hi99 ~ f4hhdg + f4hhdg_squared, data = dataClean2)
+summary(linearModel2)
+summary(linearModel2_squared)
+anova(linearModel2, linearModel2_squared)
+```
+
