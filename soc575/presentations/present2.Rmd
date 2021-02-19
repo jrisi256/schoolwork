@@ -9,6 +9,15 @@ knitr::opts_chunk$set(echo = F)
 
 Seminar leadership question: Does watching too much television make you feel useless?
 
+**Presentation Need to Haves**
+* Consistent sample (Same N for everything, deal with missing)
+* Descriptive Graphs and Tables
+    * Bar Chart, Histogram, Violin Plots, Mean/Median/Std. Dev. for each variable.
+* Regression with just amount of TV watched (weekend + weekday) for by and f2.
+    * Qualitatively different to be watching a lot of TV during the week vs. the weekend.
+* 2nd regression with everything else (controls + confounders) for by and f2.
+* ANOVA test to compare models 1 + 2.
+
 **Strategy**
 
 1. bys42a (amount of TV watched during the weekday)
