@@ -188,5 +188,25 @@ linearModel2_squared <- lm(f4hi99 ~ f4hhdg + f4hhdg_squared, data = dataClean2)
 summary(linearModel2)
 summary(linearModel2_squared)
 anova(linearModel2, linearModel2_squared)
-```
 
+newData <-
+    tibble(f4hhdg = sort(unique(dataClean2$f4hhdg)),
+           f4hhdg_squared = f4hhdg ^ 2)
+
+predictMath <- predict(linearModel2_squared, newdata = newData,
+                       se.fit = T,
+                       interval = "confidence",
+                       level = 0.95)
+
+graphPredictionsMath <-
+    newData%>%
+    bind_cols(as_tibble(predictMath$fit))
+
+# Baby curve!
+ggplot(graphPredictionsMath, aes(x = f4hhdg, y = fit)) +
+    geom_point() +
+    geom_errorbar(aes(ymin = lwr, ymax = upr)) +
+    geom_smooth(method = "lm", se = F, formula = y ~ x + I(x^2)) +
+    geom_smooth(method = "lm", se = F, formula = y ~ x) +
+    theme_bw()
+```

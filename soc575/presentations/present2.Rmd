@@ -1,0 +1,101 @@
+---
+title: "Presentation with Anna Shetler & Joe Risi"
+output: html_document
+---
+
+```{r}
+knitr::opts_chunk$set(echo = F)
+```
+
+Seminar leadership question: Does watching too much television make you feel useless?
+
+**Strategy**
+
+1. bys42a (amount of TV watched during the weekday)
+    * don't watch TV
+    * less than 1 hour
+    * 1 - 2 hours
+    * 2 - 3 hours
+    * 3 - 4 hours
+    * 4 - 5 hours
+    * over 5 hours a day
+    
+2. bys42b (amount of TV watched during the weekend)
+    * don't watch TV
+    * less than 1 hour
+    * 1 - 2 hours
+    * 2 - 3 hours
+    * 3 - 4 hours
+    * 4 - 5 hours
+    * over 5 hours a day
+
+3. f2s35a (amount of TV watched during weekdays)
+    * don't watch TV
+    * less than 1 hour
+    * 1 - 2 hours
+    * 2 - 3 hours
+    * 3 - 5 hours
+    * over 5 hours a day
+    
+4. f2s35b (amount of TV watched during weekends)
+    * don't watch TV
+    * less than 1 hour
+    * 1 - 2 hours
+    * 2 - 3 hours
+    * 3 - 5 hours
+    * over 5 hours a day
+
+5. bys44i (I certainly feel useless at times)
+    * strongly agree
+    * agree
+    * disagree
+    * strongly disagree
+    
+6. f2s66i (r feels useless at times)
+    * strongly agree
+    * agree
+    * disagree
+    * strongly disagree
+
+Confounders (bys):
+    * teachers praise my efforts (bys59h)
+        * strongly agree
+        * agree
+        * disagree
+        * strongly disagree
+        
+Confounders (f2)
+    * f2s81c (last 30 days, # times r drank alcohol)
+        * 0 occasions
+        * 1-2 occcasions
+        * 3-19 occasions
+        * 20+ occasions
+    * f2s82 (# times r had 5 drinks or more in a row)
+        * none
+        * once
+        * twice
+        * 3-5 times
+        * 6-9 times
+        * 10 or more times
+
+Controls:
+    * sex (sex)
+    * race (race)
+    * parent's highest level of education (bypared)
+    * family income (byfaminc)
+
+## Packages
+
+```{r, message = F, warning = F}
+library(here)
+library(dplyr)
+library(ggplot2)
+library(sjlabelled)
+```
+
+## Read in data
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+```
+
