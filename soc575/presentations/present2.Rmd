@@ -1,98 +1,13 @@
 ---
 title: "Presentation with Anna Shetler & Joe Risi"
-output: html_document
+output: pdf_document
 ---
 
-```{r}
+```{r, echo = F}
 knitr::opts_chunk$set(echo = F)
 ```
 
 Seminar leadership question: Does watching too much television make you feel useless?
-
-**Presentation Need to Haves**
-* Consistent sample (Same N for everything, deal with missing)
-* Descriptive Graphs and Tables
-    * Bar Chart, Histogram, Violin Plots, Mean/Median/Std. Dev. for each variable.
-* Multicollinearity Check
-* Regression with just amount of TV watched (weekend + weekday) for by and f2.
-    * Qualitatively different to be watching a lot of TV during the week vs. the weekend.
-* 2nd regression with everything else (controls + confounders) for by and f2.
-* ANOVA test to compare models 1 + 2.
-
-**Strategy**
-
-1. bys42a (amount of TV watched during the weekday)
-    * don't watch TV
-    * less than 1 hour
-    * 1 - 2 hours
-    * 2 - 3 hours
-    * 3 - 4 hours
-    * 4 - 5 hours
-    * over 5 hours a day
-    
-2. bys42b (amount of TV watched during the weekend)
-    * don't watch TV
-    * less than 1 hour
-    * 1 - 2 hours
-    * 2 - 3 hours
-    * 3 - 4 hours
-    * 4 - 5 hours
-    * over 5 hours a day
-
-3. f2s35a (amount of TV watched during weekdays)
-    * don't watch TV
-    * less than 1 hour
-    * 1 - 2 hours
-    * 2 - 3 hours
-    * 3 - 5 hours
-    * over 5 hours a day
-    
-4. f2s35b (amount of TV watched during weekends)
-    * don't watch TV
-    * less than 1 hour
-    * 1 - 2 hours
-    * 2 - 3 hours
-    * 3 - 5 hours
-    * over 5 hours a day
-
-5. bys44i (I certainly feel useless at times)
-    * strongly agree
-    * agree
-    * disagree
-    * strongly disagree
-    
-6. f2s66i (r feels useless at times)
-    * strongly agree
-    * agree
-    * disagree
-    * strongly disagree
-
-Confounders (bys):
-    * teachers praise my efforts (bys59h)
-        * strongly agree
-        * agree
-        * disagree
-        * strongly disagree
-        
-Confounders (f2)
-    * f2s81c (last 30 days, # times r drank alcohol)
-        * 0 occasions
-        * 1-2 occcasions
-        * 3-19 occasions
-        * 20+ occasions
-    * f2s82 (# times r had 5 drinks or more in a row)
-        * none
-        * once
-        * twice
-        * 3-5 times
-        * 6-9 times
-        * 10 or more times
-
-Controls:
-    * sex (sex)
-    * race (race)
-    * parent's highest level of education (bypared)
-    * family income (byfaminc)
 
 ## Packages
 
@@ -102,6 +17,7 @@ library(here)
 library(MASS)
 library(dplyr)
 library(haven)
+library(sjPlot)
 library(forcats)
 library(ggplot2)
 library(stringr)
@@ -113,9 +29,35 @@ library(ggcorrplot)
 
 ```{r}
 data <- haven::read_dta(here("class data.dta"))
+dataClean <-
+    data %>%
+    mutate(byfaminc = as_character(byfaminc),
+           byfaminc = fct_recode(byfaminc,
+                                 "Less than $10,000" = "none",
+                                 "Less than $10,000" = "less than $1,000",
+                                 "Less than $10,000" = "$1,000 - $2,999",
+                                 "Less than $10,000" = "$3,000 - $4,999",
+                                 "Less than $10,000"= "$5,000 - $7,499",
+                                 "Less than $10,000" = "$7,500 - $9,999",
+                                 "$10,000 - $19,999" = "$10,000-$14,999",
+                                 "$10,000 - $19,999" = "$15,000-$19,999",
+                                 "$75,000 and above" = "$75,000-$99,999",
+                                 "$75,000 and above" = "$100,000-199,999",
+                                 "$75,000 and above" = "$200,000 or more"),
+           byfaminc = fct_relevel(byfaminc,
+                                  "Less than $10,000",
+                                  "$10,000 - $19,999",
+                                  "$20,000-$24,999",
+                                  "$25,000-$34,999",
+                                  "$35,000-$49,999",
+                                  "$50,000-$74,999",
+                                  "$75,000 and above"),
+           sex = as.factor(as_character(sex)),
+           race = as.factor(as_character(race)),
+           bypared = as.factor(as_character(bypared)))
 
-baseYear <- select(data, bys42a, bys42b, bys44i, sex, race, bypared, byfaminc)
-followYear <- select(data, f2s35a, f2s35b, f2s66i, sex, race, bypared, byfaminc)
+baseYear <- select(dataClean, bys42a, bys42b, bys44i, sex, race, bypared, byfaminc)
+followYear <- select(dataClean, f2s35a, f2s35b, f2s66i, sex, race, bypared, byfaminc)
 
 baseYearClean <-
     baseYear %>%
@@ -139,19 +81,33 @@ followYearClean <-
 ## Correlation Matrices, Nothing looks too correlated thankfully
 
 ```{r}
-byCorr <- cor(select(baseYearClean, -sex, -race))
-fyCorr <- cor(select(followYearClean, -sex, -race))
+baseYearCorr <-
+    baseYearClean %>%
+    mutate(bys44i = as.numeric(bys44i),
+           bys42a = as.numeric(bys42a),
+           bys42b = as.numeric(bys42b),
+           bypared = as.numeric(bypared),
+           byfaminc = as.numeric(byfaminc))
+
+followYearCorr <-
+    followYearClean %>%
+    mutate(f2s66i = as.numeric(f2s66i),
+           f2s35a = as.numeric(f2s35a),
+           f2s35b = as.numeric(f2s35b),
+           bypared = as.numeric(bypared),
+           byfaminc = as.numeric(byfaminc))
+
+byCorr <- cor(select(baseYearCorr, -sex, -race))
+fyCorr <- cor(select(followYearCorr, -sex, -race))
 
 ggcorrplot(byCorr,
            type = "lower",
-           hc.order = T,
            method = "circle",
            colors = c("red", "white", "blue")) +
     ggtitle("Correlational Matrix For Base Year")
 
 ggcorrplot(fyCorr,
            type = "lower",
-           hc.order = T,
            method = "circle",
            colors = c("red", "white", "blue")) +
     ggtitle("Correlational Matrix For Follow-Up Year")
@@ -159,8 +115,26 @@ ggcorrplot(fyCorr,
 
 ## Run Ordinal Logistic Regression
 
+### Run the model for the base year only including TV watching
+
 ```{r}
-baseYearModel1Wide <-
+baseYearModel <-
+    baseYearClean %>%
+    select(bys44i, bys42a, bys42b) %>%
+    mutate(bys44i = as.factor(bys44i),
+           bys42a = as.numeric(bys42a),
+           bys42b = as.numeric(bys42b))
+
+ordinalBasicBase <- MASS::polr(bys44i ~ ., data = baseYearModel)
+summary(ordinalBasicBase)
+100 * (exp(coef(ordinalBasicBase)) - 1)
+tab_model(ordinalBasicBase)
+```
+
+### Run the model for the base year only including TV watching as a categorical varible
+
+```{r}
+baseYearModelWide <-
     baseYearClean %>%
     select(bys44i, bys42a, bys42b) %>%
     mutate(bys42a = as.factor(as_character(bys42a)),
@@ -173,7 +147,92 @@ baseYearModel1Wide <-
              "bys42b.1.2.hours", "bys42b.2.3.hours", "bys42b.3.4.hours",
              "bys42b.4.5.hours", "bys42b.over.5.hrs.a.day") %>%
     mutate(bys44i = as.factor(bys44i)) %>%
-    select(-bys42a.don.t.watch.tv, -bys42b.don.t.watch.tv)
+    select(-bys42a.over.5.hrs.a.day, -bys42b.over.5.hrs.a.day)
 
-ordinalBasicBase <- MASS::polr(bys44i ~ ., data = baseYearModel1Wide)
+ordinalBasicBaseWide <- MASS::polr(bys44i ~ ., data = baseYearModelWide)
+summary(ordinalBasicBaseWide)
+100 * (exp(coef(ordinalBasicBaseWide)) - 1)
+tab_model(ordinalBasicBaseWide)
+```
+
+### Run the model for the base year only with TV watching and controls
+
+```{r}
+baseYearModelControls <-
+    baseYearClean %>%
+    createDummyFeatures() %>%
+    relocate("bypared.didn.t.finish.hs", "bypared.h.s..grad.or.ged",
+             "bypared...hs.....4yr.deg", "bypared.college.graduate",
+             "bypared.m.a..equivalent", "bypared.ph.d...m.d...other") %>%
+    mutate(bys44i = as.factor(bys44i),
+           bys42a = as.numeric(bys42a),
+           bys42b = as.numeric(bys42b)) %>%
+    select(-sex.male, -race.white.not.hispanic, -byfaminc.Less.than..10.000,
+           -bypared.didn.t.finish.hs)
+
+ordinalControlsBase <- MASS::polr(bys44i ~ ., data = baseYearModelControls)
+summary(ordinalControlsBase)
+100 * (exp(coef(ordinalControlsBase)) - 1)
+tab_model(ordinalControlsBase)
+```
+
+### Run the model for the follow-up year only including TV watching
+
+```{r}
+followYearModel <-
+    followYearClean %>%
+    select(f2s66i, f2s35a, f2s35b) %>%
+    mutate(f2s66i = as.factor(f2s66i),
+           f2s35a = as.numeric(f2s35a),
+           f2s35b = as.numeric(f2s35b))
+
+ordinalBasicFollow <- MASS::polr(f2s66i ~ ., data = followYearModel)
+summary(ordinalBasicFollow)
+100 * (exp(coef(ordinalBasicFollow)) - 1)
+tab_model(ordinalBasicFollow)
+```
+
+### Run the model for the follow-up year only including TV watching as a categorical variable
+
+```{r}
+followYearModelWide <-
+    followYearClean %>%
+    select(f2s66i, f2s35a, f2s35b) %>%
+    mutate(f2s35a = as.factor(as_character(f2s35a)),
+           f2s35b = as.factor(as_character(f2s35b))) %>%
+    createDummyFeatures() %>%
+    relocate("f2s35a.don.t.watch.tv", "f2s35a.less.1hr.day",
+             "f2s35a.1.2.hours.day", "f2s35a.2.3.hours.day", "f2s35a.3.5.hours.day",
+             "f2s35a.5.hrs.more.a.day",
+             "f2s35b.don.t.watch.tv", "f2s35b.less.1hr.day",
+             "f2s35b.1.2.hours.day", "f2s35b.2.3.hours.day", "f2s35b.3.5.hours.day",
+             "f2s35b.5hrs.more.a.day") %>%
+    mutate(f2s66i = as.factor(f2s66i)) %>%
+    select(-f2s35a.5.hrs.more.a.day, -f2s35b.5hrs.more.a.day)
+
+ordinalBasicFollowWide <- MASS::polr(f2s66i ~ ., data = followYearModelWide)
+summary(ordinalBasicFollowWide)
+100 * (exp(coef(ordinalBasicFollowWide)) - 1)
+tab_model(ordinalBasicFollowWide)
+```
+
+### Run the model for the follow-up year only including TV watching + controls
+
+```{r}
+followYearModelControls <-
+    followYearClean %>%
+    createDummyFeatures() %>%
+    relocate("bypared.didn.t.finish.hs", "bypared.h.s..grad.or.ged",
+             "bypared...hs.....4yr.deg", "bypared.college.graduate",
+             "bypared.m.a..equivalent", "bypared.ph.d...m.d...other") %>%
+    mutate(f2s66i = as.factor(f2s66i),
+           f2s35a = as.numeric(f2s35a),
+           f2s35b = as.numeric(f2s35b)) %>%
+    select(-sex.male, -race.white.not.hispanic, -byfaminc.Less.than..10.000,
+           -bypared.didn.t.finish.hs)
+
+ordinalControlsFollow <- MASS::polr(f2s66i ~ ., data = followYearModelControls)
+summary(ordinalControlsFollow)
+100 * (exp(coef(ordinalControlsFollow)) - 1)
+tab_model(ordinalControlsFollow)
 ```
