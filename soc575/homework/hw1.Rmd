@@ -3,15 +3,18 @@ title: 'Homework #1 - Joe Risi'
 output: pdf_document
 ---
 
-## Packages
+```{r, echo = F}
+knitr::opts_chunk$set(echo = F)
+```
 
-```{r, message = F, warning = F, echo = F}
+```{r, message = F, warning = F}
 library(mlr)
 library(here)
 library(dplyr)
 library(purrr)
 library(tidyr)
 library(haven)
+library(broom)
 library(ggplot2)
 library(forcats)
 library(stringr)
@@ -19,7 +22,7 @@ library(reghelper)
 library(sjlabelled)
 ```
 
-```{r, echo = F}
+```{r}
 data <- haven::read_dta(here("class data.dta"))
 
 # Filter out missings, recode family income, make dummy variables
@@ -84,7 +87,7 @@ dataWide <-
     * 75,000 and above (byfaminc)
     * higher.sch.aftr.coll (bys45)
 
-```{r, echo = F}
+```{r}
 # Run regressions
 linearModel <- lm(bygrads ~ ., data = dataWide)
 summary(linearModel)
@@ -106,7 +109,7 @@ summary(linearModel)
     * Having expectations of attending college decreases your GPA by 0.60532 points on average.
     * Having expectations of finishing college decreases your GPA by 0.24041 points on average.
 
-```{r, echo = F}
+```{r}
 beta(linearModel, x = F)
 ```
 
@@ -128,19 +131,19 @@ The above results represent **y-standardized** coefficients. It does not make se
     * Having expectations of attending college decreases your GPA by 0.82823 standard deviations on average.
     * Having expectations of finishing college decreases your GPA by 0.32894 standard deviations on average.
     
-```{r, echo = F}
+```{r}
 predict <- tibble(won.t.finish.h.s = c(1, 0, 0, 0, 0),
                   will.finish.h.s = c(0, 1, 0, 0, 0),
                   voc.trd.bus.aftr.h.s = c(0, 0, 1, 0, 0),
                   will.attend.college = c(0, 0, 0, 1, 0),
                   will.finish.college = c(0, 0, 0, 0, 1),
-                  Less.than..10.000 = c(0, 0, 0, 0, 0),
-                  `10.000....19.999` = c(0, 0, 0, 0, 0),
-                  `20.000..24.999` = c(0, 0, 0, 0, 0),
-                  `25.000..34.999` = c(0, 0, 0, 0, 0),
-                  `35.000..49.999` = c(1, 1, 1, 1, 1),
-                  `50.000..74.999` = c(0, 0, 0, 0, 0),
-                  `male` = c(0, 0, 0, 0, 0))
+                  Less.than..10.000 = mean(dataWide$Less.than..10.000),
+                  `10.000....19.999` = mean(dataWide$`10.000....19.999`),
+                  `20.000..24.999` = mean(dataWide$`20.000..24.999`),
+                  `25.000..34.999` = mean(dataWide$`25.000..34.999`),
+                  `35.000..49.999` = mean(dataWide$`35.000..49.999`),
+                  `50.000..74.999` = mean(dataWide$`50.000..74.999`),
+                  `male` = mean(dataWide$male))
 
 predictions <-
     as_tibble(predict(linearModel,
@@ -171,7 +174,7 @@ ggplot(predictions, aes(x = educational_expectations, y = fit)) +
          title = "Expected value of GPA, holding family income and gender constant")
 ```
 
-Because I used categorical variables for everything in my model, I had to set family income and sex equal to their modal values (\$35,000 - \$49,999 and female) to hold them constant.
+By holding family income and sex constant, I held each categorical variable at its mean value.
 
 ## Question 2
 
@@ -182,31 +185,209 @@ dataClean2 <-
     filter(across(everything(), ~!is.na(.x))) %>%
     filter(f4hi99 != 0) %>%
     mutate(f4hhdg_squared = f4hhdg ^ 2)
+```
 
+1. I filter out all missing observations and all observations where the individual made $0. I go from `r nrow(data)` records to `r nrow(dataClean2)` records.
+    * Another possible data cleaning decision could have been to drop all observations where f4aempl == 0 (the individual was not employed for pay). It seemed important to me to capture the fact that some of these individuals still reported income (there are some individual who reportedly didn't work but still reported income), and I do not drop them.
+    * It is sometimes the case that incomes 5 times above the median or greater are dropped. I keep them and see if any of them show up as outliers later.
+    * It can be also be common to practice to log transform the income variable. This is done to account for the right-hand skew of the data. However the data looks pretty normal (very few outlier values, see plot below) so I did not log transform the income variable.
+2. I turn partnership status (f4gmrs) into a series of dummy variables, and I drop the single, never married category so it can serve as the reference.
+    
+```{r}
+ggplot(dataClean2, aes(x = f4hi99)) + geom_histogram(bins = 100) + theme_bw()
+```
+
+```{r}
 linearModel2 <- lm(f4hi99 ~ f4hhdg, data = dataClean2)
 linearModel2_squared <- lm(f4hi99 ~ f4hhdg + f4hhdg_squared, data = dataClean2)
 summary(linearModel2)
 summary(linearModel2_squared)
 anova(linearModel2, linearModel2_squared)
+```
 
-newData <-
-    tibble(f4hhdg = sort(unique(dataClean2$f4hhdg)),
-           f4hhdg_squared = f4hhdg ^ 2)
+There is marginal evidence to suggest the effect of educational attainment on yearly income may be non-linear. A plot may prove useful.
 
-predictMath <- predict(linearModel2_squared, newdata = newData,
-                       se.fit = T,
-                       interval = "confidence",
-                       level = 0.95)
+```{r}
+predict2 <- tibble(f4hhdg = as.numeric(sort(unique(dataClean2$f4hhdg))),
+                    f4hhdg_squared = f4hhdg ^ 2)
 
-graphPredictionsMath <-
-    newData%>%
-    bind_cols(as_tibble(predictMath$fit))
+predictions2 <-
+    as_tibble(predict(linearModel2_squared,
+                      newdata = predict2,
+                      se.fit = T,
+                      interval = "confidence",
+                      level = 0.95)$fit) %>%
+    bind_cols(predict2)
 
-# Baby curve!
-ggplot(graphPredictionsMath, aes(x = f4hhdg, y = fit)) +
+ggplot(predictions2, aes(x = f4hhdg, y = fit)) +
     geom_point() +
     geom_errorbar(aes(ymin = lwr, ymax = upr)) +
     geom_smooth(method = "lm", se = F, formula = y ~ x + I(x^2)) +
-    geom_smooth(method = "lm", se = F, formula = y ~ x) +
     theme_bw()
 ```
+
+The graphical evidence suggests there may be a slight curve in the data with increasing returns to education (each extra unit of education produces a bigger bump in income than the previous unit increase). The evidence though is suggestive and not definitive.
+
+```{r}
+influence <-
+    broom::augment(linearModel2) %>%
+    mutate(id = row_number(),
+           stdResidualSq = .std.resid ^ 2)
+
+ggplot(influence, aes(x = stdResidualSq, y = .hat)) +
+    geom_point() +
+    geom_line(aes(x = .cooksd, y = .hat), color = "red") +
+    theme_bw() +
+    geom_text(aes(label = id))
+
+noOutliers <-
+    influence %>%
+    filter(!(id %in% c(471, 7230, 6640, 3218, 2435)))
+
+linearModelNoOutliers <- lm(f4hi99 ~ f4hhdg, data = noOutliers)
+summary(linearModel2)
+summary(linearModelNoOutliers)
+```
+
+There are some potential outliers but removing them from the linear regression doesn't change the model very much so the outliers aren't concerning.
+
+```{r}
+dataClean2a <-
+    dataClean2 %>%
+    mutate(f4hhdg_squared = f4hhdg ^ 2,
+           f4hhdg = as.numeric(f4hhdg),
+           f4hi99 = as.numeric(f4hi99),
+           f4gmrs = as.factor(as_character(f4gmrs))) %>%
+    createDummyFeatures() %>%
+    select(-f4gmrs.single..never.married)
+
+colnames(dataClean2a) <- str_replace(colnames(dataClean2a), "f4gmrs.", "")
+
+linearModel2a <- lm(f4hi99 ~ ., data = dataClean2a)
+summary(linearModel2a)
+anova(linearModel2_squared, linearModel2a)
+```
+
+The ANOVA test indicates a statistically significant amount of more variation is explained when including the dummy variables for partnership status. However only a few of the partnership dummy variables are statistically significant, and the differences in the $R^2$ values between the two models is very small. Substantively these variables don't add much to the model.
+
+* The coefficient for f4hhdg is a bit contextual as we're now stating the effect of education on income is dependent upon what specific level of education one has. It shall be interpreted below.
+* The coefficient for the f4hhdg_squared term is positive suggesting the curve is convex meaning the more education one gets, the higher the boost in earnings one gets for each extra level of education obtained (statistically significant at the 0.1 level).
+* If we wanted to get a sense for how much getting an Associate's Degree adds to your income, we can take the derivative:
+    * Constant Effect of Education (fhddg) ~ 504.4
+    * Changing Effect of Education (fhddg_squared) ~ 281.0 (5 for Associate's Degree, 2 for derivative term)
+    * Boost in Income ~ 504.4 + 5 * 2 * 281 = 3314.4
+    * Compare to the boost in income you get from having a Bachelor's Degree: 504.4 + 6 * 2 * 281 ~ 3876.4. Notice how the boost went up, consistent with our observation of the increasing returns of education.
+
+* Relative to those who were single and never married as of 2000 while holding all other variables in the model constant:
+    * Being divorced decreases your income by \$1285.6 on average.
+    * Being in a marriage-like relationship increases your income by \$4097.0 on average (statistically significant at the 0.1 level).
+    * Being in a marriage increases your income by \$993.1 on average (statistically significant at the 0.05 level).
+    * Being separated decreases your income by \$3453.0 on average.
+    * Being widowed decreases your income by \$21303.2 on average (only 1 person in the sample was widowed).
+    
+* What is the expected yearly income of a respondent who is married with an Associate's Degree?
+    * Intercept ~ 23170.40
+    * Married ~ 993.10
+    * Constant Effect of Education (fhddg) ~ 504.4
+    * Changing Effect of Education (fhddg_squared) ~ 281.0
+    * 23170.40 + 993.10 + 5 * 504.4 + 281 * 25 ~ 33710.46
+
+## Question 3
+
+```{r}
+dataClean3 <-
+    data %>%
+    select(f4gnch, f4gmrs, sex, f4aempl) %>%
+    filter(across(everything(), ~!is.na(.x)))
+```
+
+1. I filter out all missing observations. I go from `r nrow(data)` records to `r nrow(dataClean3)` records.
+2. I turn partnership status (f4gmrs) and sex (sex) into dummy variables. I drop males and those who were single, never married to serve as the reference groups.
+
+```{r}
+dataWide3 <-
+    dataClean3 %>%
+    mutate(f4gnch = as.numeric(f4gnch),
+           f4gmrs = as.factor(as_character(f4gmrs)),
+           sex = as.factor(as_character(sex)),
+           f4aempl = as.numeric(f4aempl)) %>%
+        createDummyFeatures() %>%
+    select(-sex.male, -f4gmrs.single..never.married)
+
+logitModel <- glm(f4aempl ~ ., data = dataWide3, family = "binomial")
+summary(logitModel)
+
+# Odds-Ratios
+oddsRatios <- 100 * (exp(coef(logitModel)) - 1)
+oddsRatios <- oddsRatios[names(oddsRatios) != "(Intercept)"]
+oddsRatios
+```
+
+* The number of children is highly statistically significant as is being female. The relationship variables aren't really statistically significant except for being divorced (significant at the 0.05 level).
+* Holding all other variables in the model constant, each additional child decreases the odds of being employed by 35.6% on average.
+* Holding all other variables in the model constant, being female decreases the odds of being employed by 50.1% on average relative to males.
+* Relative to people who are single and have never been married while holding all other variables in the model constant:
+    * Being divorced increases the odds of being employed by 38.5% on average.
+    * Being in a marriage-like relationship decreases the odds of being employed by 15.4% on average.
+    * Being married increases the odds of being employed by 6.6% on average.
+    * Being separated increases the odds of being employed by 14.0% on average.
+    * Being widowed increases the odds of being employed by 40.1% on average.
+    
+```{r}
+predict3 <- dataWide3 %>% select(-f4aempl)
+predictions3 <- as_tibble(predict(logitModel,
+                                  newdata = predict3,
+                                  type = "response"))
+ggplot(predictions3, aes(x = value)) + geom_histogram(bins = 40) + theme_bw()
+```
+
+Above are the predicted probabilities. As you can see, most people are predicted as being employed.
+
+```{r}
+predictAverageDf <-
+    tibble(f4gnch = mean(dataWide3$f4gnch),
+           f4gmrs.divorced = mean(dataWide3$f4gmrs.divorced),
+           f4gmrs.in.marriage.like.relationship = mean(dataWide3$f4gmrs.in.marriage.like.relationship),
+           f4gmrs.married = mean(dataWide3$f4gmrs.married),
+           f4gmrs.separated = mean(dataWide3$f4gmrs.separated),
+           f4gmrs.widowed = mean(dataWide3$f4gmrs.widowed),
+           sex.female = mean(dataWide3$sex.female))
+
+predictionAverage <- as_tibble(predict(logitModel,
+                                       newdata = predictAverageDf,
+                                       type = "response",
+                                       se.fit = T))
+
+predictMother3Df <-
+    tibble(f4gnch = 3,
+           f4gmrs.divorced = 0,
+           f4gmrs.in.marriage.like.relationship = 0,
+           f4gmrs.married = 0,
+           f4gmrs.separated = 0,
+           f4gmrs.widowed = 0,
+           sex.female = 1)
+
+predictionMother3 <- as_tibble(predict(logitModel,
+                                       newdata = predictMother3Df,
+                                       type = "response",
+                                       se.fit = T))
+
+predictFatherDf <-
+    tibble(f4gnch = mean(dataWide3$f4gnch),
+           f4gmrs.divorced = 0,
+           f4gmrs.in.marriage.like.relationship = 0,
+           f4gmrs.married = 1,
+           f4gmrs.separated = 0,
+           f4gmrs.widowed = 0,
+           sex.female = 0)
+
+predictionFather <- as_tibble(predict(logitModel,
+                                       newdata = predictFatherDf,
+                                       type = "response",
+                                       se.fit = T))
+```
+
+
+* The predicted probability of being employed for the average respondent is ~0.8778169.
+* The predicted probability of being employed for a single mother with exactly 3 children is ~0.6349911.
+* The predicted probability of being employed as a married father is ~ 0.9140363.

@@ -13,6 +13,7 @@ Seminar leadership question: Does watching too much television make you feel use
 * Consistent sample (Same N for everything, deal with missing)
 * Descriptive Graphs and Tables
     * Bar Chart, Histogram, Violin Plots, Mean/Median/Std. Dev. for each variable.
+* Multicollinearity Check
 * Regression with just amount of TV watched (weekend + weekday) for by and f2.
     * Qualitatively different to be watching a lot of TV during the week vs. the weekend.
 * 2nd regression with everything else (controls + confounders) for by and f2.
@@ -96,15 +97,83 @@ Controls:
 ## Packages
 
 ```{r, message = F, warning = F}
+library(mlr)
 library(here)
+library(MASS)
 library(dplyr)
+library(haven)
+library(forcats)
 library(ggplot2)
+library(stringr)
 library(sjlabelled)
+library(ggcorrplot)
 ```
 
-## Read in data
+## Read in data and clean data
 
 ```{r}
 data <- haven::read_dta(here("class data.dta"))
+
+baseYear <- select(data, bys42a, bys42b, bys44i, sex, race, bypared, byfaminc)
+followYear <- select(data, f2s35a, f2s35b, f2s66i, sex, race, bypared, byfaminc)
+
+baseYearClean <-
+    baseYear %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(bys44i = as.character(fct_recode(sjlabelled::as_factor(bys44i),
+                                            "1" = "4",
+                                            "2" = "3",
+                                            "3" = "2",
+                                            "4" = "1")))
+
+followYearClean <-
+    followYear %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(f2s66i = as.character(fct_recode(sjlabelled::as_factor(f2s66i),
+                                            "1" = "4",
+                                            "2" = "3",
+                                            "3" = "2",
+                                            "4" = "1")))
 ```
 
+## Correlation Matrices, Nothing looks too correlated thankfully
+
+```{r}
+byCorr <- cor(select(baseYearClean, -sex, -race))
+fyCorr <- cor(select(followYearClean, -sex, -race))
+
+ggcorrplot(byCorr,
+           type = "lower",
+           hc.order = T,
+           method = "circle",
+           colors = c("red", "white", "blue")) +
+    ggtitle("Correlational Matrix For Base Year")
+
+ggcorrplot(fyCorr,
+           type = "lower",
+           hc.order = T,
+           method = "circle",
+           colors = c("red", "white", "blue")) +
+    ggtitle("Correlational Matrix For Follow-Up Year")
+```
+
+## Run Ordinal Logistic Regression
+
+```{r}
+baseYearModel1Wide <-
+    baseYearClean %>%
+    select(bys44i, bys42a, bys42b) %>%
+    mutate(bys42a = as.factor(as_character(bys42a)),
+           bys42b = as.factor(as_character(bys42b))) %>%
+    createDummyFeatures() %>%
+    relocate("bys42a.don.t.watch.tv", "bys42a.lt.1.hour.a.day",
+             "bys42a.1.2.hours", "bys42a.2.3.hours", "bys42a.3.4.hours",
+             "bys42a.4.5.hours", "bys42a.over.5.hrs.a.day",
+             "bys42b.don.t.watch.tv", "bys42b.lt.1.hour.a.day",
+             "bys42b.1.2.hours", "bys42b.2.3.hours", "bys42b.3.4.hours",
+             "bys42b.4.5.hours", "bys42b.over.5.hrs.a.day") %>%
+    mutate(bys44i = as.factor(bys44i)) %>%
+    select(-bys42a.don.t.watch.tv, -bys42b.don.t.watch.tv)
+
+ordinalBasicBase <- MASS::polr(bys44i ~ ., data = baseYearModel1Wide)
+```

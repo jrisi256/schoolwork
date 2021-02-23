@@ -109,7 +109,6 @@ ggplot(predictions, aes(x = value)) + geom_histogram(bins = 35) + theme_bw()
 ```
 
 For the average student you would do:
-~!is.na(.x)
 * Add expected natural log = intercept + logit coef_1 * mean_1 + logit_coef_2 * mean_2 + ...
 * Expected probability = exp(expected natural log) / (1 + exp(expected natural log))
 * Average student has "expected probability" chance of dropping out.
