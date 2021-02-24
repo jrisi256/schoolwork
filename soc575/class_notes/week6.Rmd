@@ -1,0 +1,38 @@
+---
+title: "Week 6"
+output: html_document
+---
+
+```{r}
+library(here)
+library(MASS)
+library(haven)
+library(dplyr)
+library(forcats)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+```
+
+```{r}
+noMissing <-
+    data %>%
+    select(bys59h, byhomewk) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    filter(byhomewk != 99) %>%
+    mutate(bys59h = as.factor(as.character(fct_recode(as_factor(bys59h),
+                                                      "1" = "4",
+                                                      "2" = "3",
+                                                      "3" = "2",
+                                                      "4" = "1"))),
+           byhomewk_scaled = (byhomewk - mean(byhomewk)) / sd(byhomewk))
+
+model <- MASS::polr(bys59h ~ byhomewk, data = noMissing)
+summary(model)
+
+modelStd <- MASS::polr(bys59h ~ byhomewk_scaled, data = noMissing)
+exp(coef(modelStd))
+```
+

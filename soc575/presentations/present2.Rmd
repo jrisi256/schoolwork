@@ -11,11 +11,13 @@ Seminar leadership question: Does watching too much television make you feel use
 
 ```{r, message = F, warning = F}
 library(mlr)
+library(car)
 library(here)
 library(MASS)
 library(dplyr)
 library(haven)
 library(brant)
+library(broom)
 library(forcats)
 library(ggplot2)
 library(stringr)
@@ -124,6 +126,8 @@ baseYearModel <-
 ordinalBasicBase <- MASS::polr(bys44i ~ ., data = baseYearModel)
 summary(ordinalBasicBase)
 exp(coef(ordinalBasicBase))
+obb <- broom::tidy(ordinalBasicBase, conf.int = T, exponentiate = T, p.value = T)
+car::poTest(ordinalBasicBase)
 ```
 
 ### Run the model for the base year only including TV watching as a categorical varible
