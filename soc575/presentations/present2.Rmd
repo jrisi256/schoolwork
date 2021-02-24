@@ -7,9 +7,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = F)
 ```
 
-Seminar leadership question: Does watching too much television make you feel useless?
-
-## Packages
+Seminar leadership question: Does watching too much television make you feel useless?  
 
 ```{r, message = F, warning = F}
 library(mlr)
@@ -17,15 +15,13 @@ library(here)
 library(MASS)
 library(dplyr)
 library(haven)
-library(sjPlot)
+library(brant)
 library(forcats)
 library(ggplot2)
 library(stringr)
 library(sjlabelled)
 library(ggcorrplot)
 ```
-
-## Read in data and clean data
 
 ```{r}
 data <- haven::read_dta(here("class data.dta"))
@@ -127,8 +123,7 @@ baseYearModel <-
 
 ordinalBasicBase <- MASS::polr(bys44i ~ ., data = baseYearModel)
 summary(ordinalBasicBase)
-100 * (exp(coef(ordinalBasicBase)) - 1)
-tab_model(ordinalBasicBase)
+exp(coef(ordinalBasicBase))
 ```
 
 ### Run the model for the base year only including TV watching as a categorical varible
@@ -151,8 +146,7 @@ baseYearModelWide <-
 
 ordinalBasicBaseWide <- MASS::polr(bys44i ~ ., data = baseYearModelWide)
 summary(ordinalBasicBaseWide)
-100 * (exp(coef(ordinalBasicBaseWide)) - 1)
-tab_model(ordinalBasicBaseWide)
+exp(coef(ordinalBasicBaseWide))
 ```
 
 ### Run the model for the base year only with TV watching and controls
@@ -172,8 +166,8 @@ baseYearModelControls <-
 
 ordinalControlsBase <- MASS::polr(bys44i ~ ., data = baseYearModelControls)
 summary(ordinalControlsBase)
-100 * (exp(coef(ordinalControlsBase)) - 1)
-tab_model(ordinalControlsBase)
+exp(coef(ordinalControlsBase))
+brant(ordinalControlsBase)
 ```
 
 ### Run the model for the follow-up year only including TV watching
@@ -188,8 +182,8 @@ followYearModel <-
 
 ordinalBasicFollow <- MASS::polr(f2s66i ~ ., data = followYearModel)
 summary(ordinalBasicFollow)
-100 * (exp(coef(ordinalBasicFollow)) - 1)
-tab_model(ordinalBasicFollow)
+exp(coef(ordinalBasicFollow))
+brant(ordinalBasicFollow)
 ```
 
 ### Run the model for the follow-up year only including TV watching as a categorical variable
@@ -212,8 +206,8 @@ followYearModelWide <-
 
 ordinalBasicFollowWide <- MASS::polr(f2s66i ~ ., data = followYearModelWide)
 summary(ordinalBasicFollowWide)
-100 * (exp(coef(ordinalBasicFollowWide)) - 1)
-tab_model(ordinalBasicFollowWide)
+exp(coef(ordinalBasicFollowWide))
+brant(ordinalBasicFollowWide)
 ```
 
 ### Run the model for the follow-up year only including TV watching + controls
@@ -233,6 +227,6 @@ followYearModelControls <-
 
 ordinalControlsFollow <- MASS::polr(f2s66i ~ ., data = followYearModelControls)
 summary(ordinalControlsFollow)
-100 * (exp(coef(ordinalControlsFollow)) - 1)
-tab_model(ordinalControlsFollow)
+exp(coef(ordinalControlsFollow))
+brant(ordinalControlsFollow)
 ```
