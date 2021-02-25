@@ -3,6 +3,12 @@ title: 'Homework #1 - Joe Risi'
 output: pdf_document
 ---
 
+Some takeaways from the lecture and feedback on the homework:
+
+* Remember categorical variables can be used to assess non-linearity as well as introducing interaction terms.
+* You can use F-tests to assess if a model has better fit when the models are nested. You can use BIC when the the models aren't nested (like when you have dummy variables). This can help determine how likely it is there is non-linearity in the model and what form it takes.
+* When we have small bucket sizes, don't be afraid to combine categories. You just have to do it in a way which makes sense. You want to combine like categories as much as possible.
+
 ```{r, echo = F}
 knitr::opts_chunk$set(echo = F)
 ```

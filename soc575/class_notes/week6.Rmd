@@ -3,7 +3,7 @@ title: "Week 6"
 output: html_document
 ---
 
-```{r}
+```{r, message = F, warning = F}
 library(here)
 library(MASS)
 library(haven)
@@ -12,8 +12,29 @@ library(forcats)
 library(sjlabelled)
 ```
 
+## Read in data
+
 ```{r}
 data <- haven::read_dta(here("class data.dta"))
+```
+
+## BIC (Bayesian Information Criterion).
+
+Good for a test when we include dummy variables, testing models which aren't *nested*. OLS you use an F-test and look at the $R^2$ unless of course you don't have nested models. Categorical regressions tend to use BIC because they use categorical outcomes. There is no agreement on the best measures of fit though. https://www.theanalysisfactor.com/what-are-nested-models/ -> What are nested models?
+
+The lower the BIC, the better.
+
+```{r}
+dataNoMissingOls <-
+    data %>%
+    select(byfaminc, bypared, bygrads) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(bypared = as.factor(as_character(bypared)))
+
+ols <- lm(bygrads ~ byfaminc, data = dataNoMissingOls)
+ols2 <- lm(bygrads ~ byfaminc + bypared, data = dataNoMissingOls)
+stats::BIC(ols)
+stats::BIC(ols2) # better fit
 ```
 
 ```{r}
@@ -35,4 +56,3 @@ summary(model)
 modelStd <- MASS::polr(bys59h ~ byhomewk_scaled, data = noMissing)
 exp(coef(modelStd))
 ```
-
