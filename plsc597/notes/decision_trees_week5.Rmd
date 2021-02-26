@@ -1,0 +1,117 @@
+---
+title: "Decision Trees"
+output: html_document
+---
+
+```{r}
+library(mlr)
+library(parallel)
+library(tidyverse)
+library(rpart.plot)
+library(parallelMap)
+```
+
+```{r}
+data(Zoo, package = "mlbench")
+
+# Convert logical values to factor values because mlr doesn't work with logical
+zooTib <-
+    as_tibble(Zoo) %>%
+    mutate(across(where(is.logical), as.factor))
+```
+
+Create the task and learner
+
+```{r}
+zooTask <- makeClassifTask(data = zooTib, target = "type")
+tree <- makeLearner("classif.rpart")
+```
+
+## Hyperparameter tuning.
+
+Some other hyperparameters it might be useful to go over:
+
+* **maxcomplete**: Controls how many candidate splits can be displayed for each node in the model summary. Model summary shows the candidate splits in order of how much they improved the model (Gini gain). However this does not affect model performance.
+* **maxsurrogate**: Similar to maxcomplete, but it controls how many surrogate splits are **shown**. A surrogate split is a split used if a particular case is missing data for the actual split. Decision tress are thus able to handle missing data. This controls how many of these surrogates to retain in the model (if a case is missing a value for the main split, it is passed to the first surrogate split, then on to the second surrogate split if it's missing a value for the first surrogate).
+* **usesurrogate**: 0 means surrogates won't be used. 1 means surrogates will be used, but if a case is missing data for the actual split and all surrogate splits, that case will not be classified. 2 means surrogates will be used, but a case with missing data for everything will be sent down a branch that contained the most cases.
+
+```{r}
+getParamSet(tree)
+```
+
+First step is to define the hyperparameter space over which we want to search and optimize.
+
+```{r}
+treeParamSpace <-
+    makeParamSet(makeIntegerParam("minsplit", lower = 5, upper = 20),
+                 makeIntegerParam("minbucket", lower = 3, upper = 10),
+                 makeNumericParam("cp", lower = 0.01, upper = 0.1),
+                 makeIntegerParam("maxdepth", lower = 3, upper = 10))
+
+# Randomly select 200 combinations
+randSearch <- makeTuneControlRandom(maxit = 200)
+
+# 5-fold cross-validation, this will split the data into 5 folds and use each
+# fold as the test set once. For each test set, a model will be trained on
+# the rest of the data. 1000 models are evaluated.
+cvForTuning <- makeResampleDesc("CV", iters = 5)
+```
+
+Perform the hyperparameter tuning
+
+```{r}
+parallelStartSocket(cpus = detectCores() - 1)
+
+tunedTreePars <- tuneParams(tree,
+                            task = zooTask,
+                            resampling = cvForTuning,
+                            par.set = treeParamSpace,
+                            control = randSearch)
+
+parallelStop()
+```
+
+## Train the model with the tuned hyperparameters
+
+```{r}
+tunedTree <- setHyperPars(tree, par.vals = tunedTreePars$x)
+tunedTreeModel <- train(tunedTree, zooTask)
+```
+
+## Plot and interpret the decision tree
+
+The plot displays what percentage of each case are in each of the leaf nodes. Notice amphibian is 20% reptile and 80% amphibian. It then contains 5% of all cases.
+
+```{r}
+treeModelData <- tunedTreeModel$learner.model
+# a <- getLearnerModel(tunedTreeModel) # same thing
+
+rpart.plot(treeModelData, roundint = F, box.palette = "BuBn", type = 5)
+```
+
+Inspect the complexity parameter values for each split. The complexity parameter at the first split is 0.333. The cp at the second split is 0.217 and so on and so forth.
+
+```{r}
+printcp(treeModelData, digits = 3)
+```
+
+Summary of the model
+
+```{r}
+summary(treeModelData)
+```
+
+Cross-validate our decision tree model to get a sense of how well our model can perform out-of-sample
+
+```{r}
+outer <- makeResampleDesc("CV", iters = 5)
+treeWrapper <- makeTuneWrapper("classif.rpart",
+                               resampling = cvForTuning,
+                               par.set = treeParamSpace,
+                               control = randSearch)
+
+parallelStartSocket(cpus = detectCores() - 1)
+cvWithTuning <- resample(treeWrapper, zooTask, resampling = outer)
+parallelStop()
+```
+
