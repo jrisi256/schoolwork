@@ -1,0 +1,304 @@
+---
+title: "Decision Trees and Ensemble Methods"
+output: html_document
+---
+
+```{r}
+library(mlr)
+library(xgboost)
+library(parallel)
+library(tidyverse)
+library(rpart.plot)
+library(DiagrammeR)
+library(parallelMap)
+```
+
+```{r}
+data(Zoo, package = "mlbench")
+
+# Convert logical values to factor values because mlr doesn't work with logical
+zooTib <-
+    as_tibble(Zoo) %>%
+    mutate(across(where(is.logical), as.factor))
+```
+
+Create the task and learner
+
+```{r}
+zooTask <- makeClassifTask(data = zooTib, target = "type")
+tree <- makeLearner("classif.rpart")
+```
+
+## Hyperparameter tuning.
+
+Some other hyperparameters it might be useful to go over:
+
+* **maxcomplete**: Controls how many candidate splits can be displayed for each node in the model summary. Model summary shows the candidate splits in order of how much they improved the model (Gini gain). However this does not affect model performance.
+* **maxsurrogate**: Similar to maxcomplete, but it controls how many surrogate splits are **shown**. A surrogate split is a split used if a particular case is missing data for the actual split. Decision tress are thus able to handle missing data. This controls how many of these surrogates to retain in the model (if a case is missing a value for the main split, it is passed to the first surrogate split, then on to the second surrogate split if it's missing a value for the first surrogate).
+* **usesurrogate**: 0 means surrogates won't be used. 1 means surrogates will be used, but if a case is missing data for the actual split and all surrogate splits, that case will not be classified. 2 means surrogates will be used, but a case with missing data for everything will be sent down a branch that contained the most cases.
+
+```{r}
+getParamSet(tree)
+```
+
+First step is to define the hyperparameter space over which we want to search and optimize.
+
+```{r}
+treeParamSpace <-
+    makeParamSet(makeIntegerParam("minsplit", lower = 5, upper = 20),
+                 makeIntegerParam("minbucket", lower = 3, upper = 10),
+                 makeNumericParam("cp", lower = 0.01, upper = 0.1),
+                 makeIntegerParam("maxdepth", lower = 3, upper = 10))
+
+# Randomly select 200 combinations
+randSearch <- makeTuneControlRandom(maxit = 200)
+
+# 5-fold cross-validation, this will split the data into 5 folds and use each
+# fold as the test set once. For each test set, a model will be trained on
+# the rest of the data. 1000 models are evaluated.
+cvForTuning <- makeResampleDesc("CV", iters = 5)
+```
+
+Perform the hyperparameter tuning
+
+```{r}
+parallelStartSocket(cpus = detectCores() - 1)
+
+tunedTreePars <- tuneParams(tree,
+                            task = zooTask,
+                            resampling = cvForTuning,
+                            par.set = treeParamSpace,
+                            control = randSearch)
+
+parallelStop()
+```
+
+## Train the model with the tuned hyperparameters
+
+```{r}
+tunedTree <- setHyperPars(tree, par.vals = tunedTreePars$x)
+tunedTreeModel <- train(tunedTree, zooTask)
+```
+
+## Plot and interpret the decision tree
+
+The plot displays what percentage of each case are in each of the leaf nodes. Notice amphibian is 20% reptile and 80% amphibian. It then contains 5% of all cases.
+
+```{r}
+treeModelData <- tunedTreeModel$learner.model
+# a <- getLearnerModel(tunedTreeModel) # same thing
+
+rpart.plot(treeModelData, roundint = F, box.palette = "BuBn", type = 5)
+```
+
+Inspect the complexity parameter values for each split. The complexity parameter at the first split is 0.333. The cp at the second split is 0.217 and so on and so forth.
+
+```{r}
+printcp(treeModelData, digits = 3)
+```
+
+Summary of the model
+
+```{r}
+summary(treeModelData)
+```
+
+Cross-validate our decision tree model to get a sense of how well our model can perform out-of-sample
+
+```{r}
+outer <- makeResampleDesc("CV", iters = 5)
+treeWrapper <- makeTuneWrapper("classif.rpart",
+                               resampling = cvForTuning,
+                               par.set = treeParamSpace,
+                               control = randSearch)
+
+parallelStartSocket(cpus = detectCores() - 1)
+cvWithTuning <- resample(treeWrapper, zooTask, resampling = outer)
+parallelStop()
+```
+
+## Chapter 8 moving on to ensemble methods
+
+Some new hyperparameters for random forests:
+
+* **ntree**: The number of trees to train for your forest.
+* **mtry**: The number of features to randomly sample at each node.
+* **nodesize**: The minimum number of cases allowed in a leaf (minbucket).
+* **maxnodes**: Maximum number of leaves allowed.
+
+Create the learner.
+
+```{r}
+forest <- makeLearner("classif.randomForest")
+```
+
+Define the hyperparameter search space
+
+```{r}
+forestParamSpace <-
+    makeParamSet(makeIntegerParam("ntree", lower = 300, upper = 300),
+                 makeIntegerParam("mtry", lower = 6, upper = 12),
+                 makeIntegerParam("nodesize", lower = 1, upper = 5),
+                 makeIntegerParam("maxnodes", lower = 5, upper = 20))
+
+# We are going to do a random search with 100 iterations
+randSearch <- makeTuneControlRandom(maxit = 100)
+
+# Define a 5-fold cross-validation strategy for our search
+cvForTuning <- makeResampleDesc("CV", iters = 5)
+
+# Tune the hyperparameters
+parallelStartSocket(cpus = detectCores() - 1)
+tunedForestPars <- tuneParams(forest,
+                              task = zooTask,
+                              resampling = cvForTuning,
+                              par.set = forestParamSpace,
+                              control = randSearch)
+parallelStop()
+```
+
+Train the final model.
+
+```{r}
+tunedForest <- setHyperPars(forest, par.vals = tunedForestPars$x)
+tunedForestModel <- train(tunedForest, zooTask)
+```
+
+How do we know if we've included enough trees in our forest? We can plot the mean out-of-bag error against the tree number. When building a random forest, remember we take a bootstrap sample of cases for each tree. The out-of-bag error is the mean prediction error for each case by trees that didn't include that case in their bootstrap. I.e. how are the trees doing on cases they didn't train on?
+
+https://towardsdatascience.com/what-is-out-of-bag-oob-score-in-random-forest-a7fa23d710
+
+```{r}
+forestModelData <- tunedForestModel$learner.model
+species <- colnames(forestModelData$err.rate)
+
+# Could do this in ggplot, reshape the data, check out err.rate
+
+plot(forestModelData, col = 1:length(species), lty = 1:length(species))
+legend("topright", species, col = 1:length(species), lty = 1:length(species))
+```
+
+The x-axis is the number of trees. The y-axis is the mean out-of-bag error for each class and overall. Notice how it should stabilize over time as you add more trees. If it isn't stabilizing, then you need to add more trees!
+
+Time to cross validate the model-building process.
+
+```{r}
+# cross-fold validation for our model to see how well it does out of sample
+outer <- makeResampleDesc("CV", iters = 5)
+
+# Wrapper which captures all previous data steps
+forestWrapper <- makeTuneWrapper("classif.randomForest",
+                                 resampling = cvForTuning,
+                                 par.set = forestParamSpace,
+                                 control = randSearch)
+
+parallelStartSocket(cpus = detectCores() - 1)
+cvWithTuning <- resample(forestWrapper, zooTask, resampling = outer)
+parallelStop()
+```
+
+## Time to XGBoost into space
+
+There are some important hyperparameters we have to go over.
+
+* **eta**: The learning rate, a number between 0 and 1. The model weights are multiplied by this to give them their final weight. Lower values slows the learning process down because it shrinks improvements made between models.
+* **gamma**: The minimum amount of splitting by which a node must improve the predictions. Similar to **cp**.
+* **max_depth**: The maximum levels deep a tree can grow.
+* **min_child_weight**: The minimum degree of impurity needed in a node before attempting to split it. I.e. if a node is *pure* enough don't try to split it.
+* **subsample**: The proportion of cases to be randomly sampled (without replacement) for each tree. Setting this 1 uses all the cases in the training set.
+* **colsample_bytree**: The proportion of predictor variables sampled for each tree. There is also **colsample_bylevel** and **colsample_bynode** which sample predictors at each level of depth and at each node.
+* **nrounds**: THe number trees to build sequentially.
+* **eval_metric**: The type of loss function we're going to use. merror or mlogloss.
+
+Make a learner.
+
+```{r}
+# Make learner
+xgb <- makeLearner("classif.xgboost")
+
+# XGboost only works with numerical predictor variables, can use dummy variables
+zooXgb <-
+    zooTib %>%
+    mutate(across(!c(type), as.numeric))
+
+# Make task
+xgbTask <- makeClassifTask(data = zooXgb, target = "type")
+```
+
+Tune our hyperparameters.
+
+```{r}
+xgbParamSpace <- makeParamSet(makeNumericParam("eta", lower = 0, upper = 1),
+                              makeNumericParam("gamma", lower = 0, upper = 5),
+                              makeIntegerParam("max_depth", lower = 1, upper = 5),
+                              makeNumericParam("min_child_weight", lower = 1, upper = 10),
+                              makeNumericParam("subsample", lower = 0.5, upper = 1),
+                              makeNumericParam("colsample_bytree", lower = 0.5, upper = 1),
+                              makeIntegerParam("nrounds", lower = 20, upper = 20),
+                              makeDiscreteParam("eval_metric", values = c("merror", "mlogloss")))
+
+# 1000 iterations
+randSearch <- makeTuneControlRandom(maxit = 1000)
+
+# 5-fold cross validation for 5000 models
+cvForTuning <- makeResampleDesc("CV", iters = 5)
+
+# Begin the tuning randomly searching over the space, automatically uses all cores
+tunedXgbPars <- tuneParams(xgb, task = xgbTask,
+                           resampling = cvForTuning,
+                           par.set = xgbParamSpace,
+                           control = randSearch)
+```
+Train the final tuned model.
+
+```{r}
+tunedXgb <- setHyperPars(xgb, par.vals = tunedXgbPars$x)
+tunedXgbModel <- train(tunedXgb, xgbTask)
+```
+
+To evaluate if we've included enough trees, we plot the loss function against the iteration number.
+
+```{r}
+xgbModelData <- tunedXgbModel$learner.model
+
+ggplot(xgbModelData$evaluation_log, aes(iter, train_mlogloss)) +
+    geom_line() +
+    geom_point() +
+    theme_bw()
+```
+
+We can also plot the individual trees in our ensemble or all the trees together so to speak to get a sense of how the model works as a whole.
+
+```{r}
+xgboost::xgb.plot.tree(model = xgbModelData, trees = 1:4)
+xgboost::xgb.plot.multi.trees(xgbModelData)
+```
+
+Let's cross-validate our model to see how it performs out-of-sample (sort of).
+
+```{r}
+outer <- makeResampleDesc("CV", iters = 3)
+
+xgbWrapper <- makeTuneWrapper("classif.xgboost",
+                              resampling = cvForTuning,
+                              par.set = xgbParamSpace,
+                              control = randSearch)
+
+cvWithTuning <- resample(xgbWrapper, xgbTask, resampling = outer)
+```
+
+Benchmarking. Create a list of learners and let them fight it out to see who learn the best-performing model.
+
+```{r}
+# Create a list of learner algorithms.
+learners = list(makeLearner("classif.knn"),
+                makeLearner("classif.LiblineaRL1LogReg"),
+                makeLearner("classif.svm"),
+                tunedTree,
+                tunedForest,
+                tunedXgb)
+
+# Define cross validation methods.
+benchCV <- makeResampleDesc("RepCV", folds = 10, reps = 5)
+bench <- benchmark(learners, xgbTask, benchCV)
+```
