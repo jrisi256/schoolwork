@@ -7,7 +7,7 @@ output: pdf_document
 
 Harvard Dataverse Link - https://doi.org/10.7910/DVN/OSSD8O  
 JSTOR Stable Link to Paper - https://www.jstor.org/stable/42940606  
-Link to github repository - https://github.com/jrisi256/schoolwork/tree/main/plsc597/hw1
+Link to github repository - https://github.com/jrisi256/schoolwork/tree/main/plsc597/hw1/src
 
 ### Introduction - Is Immigration a Racial Issue? Anglo Attitudes on Immigration Policies in a Border County.
 
