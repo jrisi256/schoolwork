@@ -1,0 +1,30 @@
+---
+
+title: "Data Exploration"
+output: html_document
+---
+
+```{r, message = F, warning = F}
+library(here)
+library(readr)
+```
+
+```{r}
+data <-
+    read_fwf(here("USSC_PV_Report_2020", "USSC_PV_Report_2020.dat"),
+             fwf_widths(c(6, 1, 2, 1, 1, 2, 2, 4, 2, 1, 1, 1, 2, 3, 2, 2, 1, 1,
+                          1, 1, 1, 1, 1, 4, 1, 2, 1, 10, 6, 1, 6, 1, 1, 18, 18, 1,
+                          1, 5, 4, 3, 3, 6, 1, 1),
+                        c("USSCIDN", "ACCAP", "AGE", "AGGROLHI", "CAROFFAP",
+                          "CIRCDIST", "COMBDRG2", "FISCALYR", "MITROLHI", "MONSEX",
+                          "NEWCIT", "NEWRACE", "OFFTYPE2", "PROBATN", "PV_AGE",
+                          "PV_CIRCDIST", "PV_DISP", "PV_DSHEAR", "PV_DSJANDC",
+                          "PV_DSSUMMON", "PV_DSVIOL", "PV_DSWAIVER", "PV_DSWORK",
+                          "PV_FY", "PV_GRADVIOL", "PV_GRADVIOL_TABLE", "PV_REVTABLE",
+                          "PV_REVTABLE_CELL", "PV_SENSPLT0", "PV_SENTIMP",
+                          "PV_SENTTOT", "PV_VIOLTYP", "SAFETY", "SENSPCAP",
+                          "SENSPLT0", "SENTIMP", "SOURCES", "STATMAX", "STATMIN",
+                          "SUPREL", "SUPRVISN", "SUPSERVED", "WEAPON", "XCRHISSR")),
+             col_types = cols(PV_GRADVIOL_TABLE = "c", PV_REVTABLE_CELL = "c",
+                              PV_REVTABLE = "c"))
+```
