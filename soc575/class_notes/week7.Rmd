@@ -1,0 +1,107 @@
+---
+title: "Week 7"
+output: html_document
+---
+
+```{r}
+library(car)
+library(here)
+library(MASS)
+library(dplyr)
+library(broom)
+library(haven)
+library(oglmx)
+library(ordinal)
+library(effects)
+library(forcats)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+
+dataClean <-
+    data %>%
+    mutate(bys80 = as.factor(as_character(bys80)),
+           bys42b = as.numeric(bys42b)) %>%
+    select(bys80, bys42b) %>%
+    filter(across(everything(), ~!is.na(.x)))
+```
+
+```{r}
+model <- MASS::polr(bys80 ~ bys42b, data = dataClean)
+```
+
+Fitting a regression model for how much TV you watch on the weekend and its effect on the amount you read. Interpretation -> For every unit increase in the amount of TV watched on the weekend, this leads to 0.399% increase in the odds of reading more. Slide 10 in week 7 helps with this interpretation. The odds are higher you'll be in a higher category of reading.
+
+The odds of reading 6 hours or more per week are 0.358% higher vs. all other categories for every unit increase in the amount of TV watched on the weekend.
+
+```{r}
+summary(model)
+summaryDf <- broom::tidy(model, conf.int = T, exponentiate = T, p.value = T)
+car::poTest(model)
+```
+
+## Predicted probabilities
+
+```{r}
+predictions <- Effect(focal.predictors = c("bys42b"), model)
+```
+
+## Cross tabulations
+
+```{r}
+table(dataClean)
+```
+
+## Generalized ordered logistic Regression
+
+Relaxes proportional odds assumption.
+
+```{r}
+dataClean2 <-
+    data %>%
+    select(bys56e, bys55f, bypared) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(bys56e = as.factor(as.character(fct_recode(sjlabelled::as_factor(bys56e),
+                               "2" = "1",
+                               "1" = "2",
+                               "0" = "3"))),
+           bys55f = as.numeric(bys55f),
+           bypared = as.numeric(bypared))
+```
+
+Review of ordered logistic regression (following along with the slides). When the assumption of parallel regression is violated, you can collapse categories to use binary logistic regression. Or use generalized ordered logistic regression.
+
+```{r}
+model2 <- MASS::polr(bys56e ~ ., data = dataClean2)
+summaryDf <- tidy(model2)
+predictions2 <- Effect(focal.predictors = c("bys55f", "bypared"), model2)
+```
+
+```{r}
+dataClean3 <- dataClean2 %>% mutate(bys56e = fct_recode(bys56e, "1" = "2"))
+model3 <- glm(bys56e ~ ., data = dataClean3, family = "binomial")
+summary(model3)
+exp(coef(model3))
+```
+
+https://clanfear.github.io/Stata_R_Equivalency/docs/ordinal_models.html
+
+```{r}
+dataClean4 <-
+    data %>%
+    select(bys56e, bys55f, bypared) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(bys56e = as.factor(as.character(fct_recode(sjlabelled::as_factor(bys56e),
+                               "0" = "1",
+                               "1" = "2",
+                               "2" = "3"))),
+           bys55f = as.numeric(bys55f),
+           bypared = as.numeric(bypared))
+
+model4 <- ordinal::clm(bys56e ~ ., nominal = ~ bys55f + bypared, data = dataClean4)
+summary(model4)
+exp(coef(model4))
+```
+

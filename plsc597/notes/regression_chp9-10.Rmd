@@ -1,0 +1,281 @@
+---
+title: "Regression - Chp. 9 and 10"
+output: html_document
+---
+
+```{r}
+library(mlr)
+library(tidyverse)
+```
+
+```{r}
+data(Ozone, package = "mlbench")
+ozoneTib <- as_tibble(Ozone)
+colnames(ozoneTib) <- c("Month", "Date", "Day", "Ozone", "Press_height", "Wind",
+                        "Humid", "Temp_Sand", "Temp_Monte", "Inv_height",
+                        "Press_grad", "Inv_temp", "Visib")
+```
+
+```{r}
+ozoneClean <-
+    ozoneTib %>%
+    mutate(across(everything(), as.numeric)) %>%
+    filter(is.na(Ozone) == F)
+```
+
+Get a sense for which variables may or may have a linear relationship with the outcome variable (Ozone).
+
+```{r}
+ozoneUntidy <-
+    ozoneClean %>%
+    pivot_longer(cols = -Ozone, names_to = "Variable", values_to = "Value")
+
+ggplot(ozoneUntidy, aes(Value, Ozone)) +
+    facet_wrap(~ Variable, scale = "free_x") +
+    geom_point() +
+    geom_smooth() + # draw a LOESS curve or GAM curve depending on sample size
+    geom_smooth(method = "lm", color = "red") +
+    theme_bw()
+```
+
+Linear regression cannot deal with missing values so to avoid throwing away a lot our data we will have to impute the missing values. We can actually use machine learning to try and fill in the missing values. We have `imputeMean()`, `imputeMedian()`, `imputeMode()` which are all self-explanatory. However we also have `imputeLearner()` which lets us specify a supervised ML algorithm to predict the missing values based on the information held in all the other variables.
+
+* Split dataset into cases with and without missing values for the particular variable.
+* Decide on the algorithm to predict the missing values.
+* Considering cases without missing values, use the algorithm to predict the values of the variable with missing values (using all other variables in the dataset including the dependent variable).
+* Considering cases with missing values, use the model learned above to predict missing values.
+
+How to decide on an algorithm? Is the variable of interest continuous or categorical? Do your other variables also have missing information (remember some algorithms cannot handle missing values)? What's your computational budget? Also it's important to verify the data is **missing at random** (MAR -> the likelihood of a missing value is related only to the value of the other variables) or **missing completely at random** (MCAR -> likelihood of a missing value isn't related to any variable). If the data is **missing not at random** (MNAR), that's bad. E.g. you're trying to predict salary, but there is a bias where people with low salaries are less likely to report. **To be able to do this requires domain knowledge**.
+
+Another powerful imputation technique is called multiple imputation. You create many new datasets replacing missing data with sensible values in each one. You then train a model on each of these imputed datasets and return the average model. Check out the **mice** package in R for an implementation of this technique.
+
+```{r}
+# features argument -> which variables to use in imputation -> default is all
+imputeMethod <- imputeLearner("regr.rpart")
+
+# classes argument -> imputation techniques for classes of columns
+# cols argument -> imputation methods for specific columns, overrules classes
+ozoneImp <- impute(as.data.frame(ozoneClean),
+                   classes = list(numeric = imputeMethod))
+
+# create task
+# ozoneImp$data contains imputed dataframe
+ozoneTask <- makeRegrTask(data = ozoneImp$data, target = "Ozone")
+
+# Create learner
+ols <- makeLearner("regr.lm")
+```
+
+Feature selection. Domain knowledge is important here. We can also use algorithms to help in variable selection.
+
+* **Filter Methods**: Compare each of the predictors against the outcome variable and calculate a metric of how much the outcome varies with the predictor. E.g. correlation. Predictor variables are ranked by this metric (which in theory ranks them in order of how much information they can contribute to the model). Drop a certain number of proportion. Not as thorough as the wrapper methods but also not as computationally expensive.
+    * Linear correlation
+    * ANOVA
+    * Chi-squared
+    * Random Forest Importance (Default method in mlr is to build a random forest to predict the outcome and report variables which contributed most to the predictions).
+* **Wrapper Methods**: Iteratively train our model with different predictor variables. Eventually the combination of predictors that gives us the best performing model is chosen. One popular method for doing this is **sequential forward selection**. First a single best feature is selected (according to some criterion function). Then pairs of features are formed using one of the remaining features and this best feature. Then triples are formed. This continues until a predefined number of features are selected.
+
+```{r}
+# Rank our predictor variables
+filterVals <- generateFilterValuesData(ozoneTask, method = "linear.correlation")
+plotFilterValues(filterVals) + theme_bw() + coord_flip()
+
+# Remove variables
+
+# abs specifies number of variables to remove
+# ozoneFiltTask <- filterFeatures(ozoneTask, fval = filterVals, abs = 6)
+
+# percentage is percentage of variables to remove
+# ozoneFiltTask <- filterFeatures(ozoneTask, fval = filterVals, per = 6)
+
+# threshold is the variables have to eclipse some threshold to be considered
+# ozoneFiltTask <- filterFeatures(ozoneTask, fval = filterVals, threshold = 6)
+
+# Best to wrap learner with filter method and treat as a hyperparameter.
+filterWrapper <- makeFilterWrapper(learner = ols,
+                                   fw.method = "linear.correlation")
+
+# Create hyperparameter search space
+olsParamSpace <- makeParamSet(makeIntegerParam("fw.abs", lower = 1, upper = 12))
+
+# Grid search exploring all values
+gridSearch <- makeTuneControlGrid()
+
+# 10-fold cross validation
+kFold <- makeResampleDesc("CV", iters = 10)
+
+tunedFeats <- tuneParams(filterWrapper,
+                         task = ozoneTask,
+                         resampling = kFold,
+                         par.set = olsParamSpace,
+                         control = gridSearch)
+```
+
+For evaluating regression problems:
+
+* **Mean Absolute Error (MAE)**: Finds the absolute residual between each case and the model, adds them up, and divides by the number of cases. This is the mean absolute distance of the cases from the model.
+* **Mean Square Error (MSE)**: Similar to MAE, but it squares the residuals. This makes it more sensitive to outliers.
+* **Root Mean Square Error (RMSE)**: We take the square root of the MSE. RMSE and MSE will always select the same model, but RMSE is on the same scale as our outcome so it's more interpretable.
+
+## Train the model
+
+```{r}
+filteredTask <- filterFeatures(ozoneTask,
+                               fval = filterVals,
+                               abs = unlist(tunedFeats$x))
+
+filteredModel <- train(ols, filteredTask)
+```
+
+## What if we want to use the wrapper method instead?
+
+How do we search for the best combinations of predictors?
+
+* **Exhaustive Search**: This is a grid search which will try every combination. Quickly becomes impossible for anything other than a trivial amount of predictor variables.
+* **Random Search**: You define a number of iterations and randomly select the best feature combinations. The best combination after the final iteration wins. It isn't guaranteed to find best combination of features.
+* **Sequential Search**: From a particular starting point, we sequentially add or remove features.
+    * **Forward Search**: We start with an empty model and sequentially add features which improve model performance until additional features no longer improve performance.
+    * **Backward Search**: We start with all the features and remove the feature whose removal improves the model the most until additional removals no longer improve the performance.
+    * **Floating Forward Search**: Starting from an empty model, you either add or remove one variable at each step (whichever improves the model the most). This continues until neither an addition nor a removal improves model performance.
+    * **Floating Backward Search**: Same thing as floating forward search, but we start with a full model.
+* **Genetic algorithm**: Inspired by Darwinian evolution. It finds pairs of feature combinations which act as parents to offspring variable combinations which *inherit* the best-performing features. Computationally expensive.
+
+```{r}
+# Define the search method for the wrapper method, sequential floating backward
+featSelControl <- makeFeatSelControlSequential(method = "sfbs")
+
+# Perform feature selection
+selFeats <- selectFeatures(learner = ols,
+                           task = ozoneTask,
+                           resampling = kFold,
+                           control = featSelControl)
+
+# Train the model using the selected variables
+ozoneSelFeat <- ozoneImp$data %>% select(c("Ozone", selFeats$x))
+ozoneSelFeatTask <- makeRegrTask(data = ozoneSelFeat, target = "Ozone")
+wrapperModel <- train(ols, ozoneSelFeatTask)
+```
+
+## Cross-validation. Including imputation and feature selection
+
+Notes in the Google Docs about how to combine multiple preprocessing steps. You wrap a learner and a preprocessing step. To include an additional preprocessing step, you simply wrap the wrapped learner. Order matters! So make sure to think it through.
+
+What's happening specifically:
+
+* Split the data into three folds:
+* For each fold:
+    * Use the rpart algorithm to impute missing values.
+    * Perform feature selection and use 10-fold cross-validation to evaluate the performance of each model.
+* Return the best-performing model for each of the 3 folds.
+* Return the mean MSE to give us an estimate of our performance.
+
+```{r}
+# Creating a wrapper using another wrapper
+imputeWrapper <- makeImputeWrapper(ols, classes = list(numeric = imputeMethod))
+featSelWrapper <- makeFeatSelWrapper(learner = imputeWrapper,
+                                     resampling = kFold,
+                                     control = featSelControl)
+
+# Cross-validate our entire model-building process
+library(parallel)
+library(parallelMap)
+
+ozoneTaskWithNAs <- makeRegrTask(data = ozoneClean, target = "Ozone")
+kFold3 <- makeResampleDesc("CV", iters = 3)
+
+parallelStartSocket(cpus = detectCores() - 1)
+
+olsCV <- resample(featSelWrapper, ozoneTaskWithNAs, resampling = kFold3)
+
+parallelStop()
+```
+
+## Interpreting the linear models
+
+```{r}
+wrapperModelData <- wrapperModel$learner.model
+summary(wrapperModelData)
+```
+
+Diagnostic Plots
+
+* **Residuals vs. Fitted** shows the predicted ozone level on the x-axis and the residual on the y-axis. There should be no patterns in this plot (the amount of error shouldn't depend on the predicted value). Our plot indicates a relationship between predictors and ozone or heteroscedasticity.
+* **Normal Q-Q** or Quantile-Quantile shows the quantiles of the model residuals plotted aginst their quantiles if they were drawn from a theoretical normal distribution. They should not deviate from a straight line (otherwise the residuals wouldn't be normally distributed).
+* **Scale-Location** seems very similary to residuals vs. fitted.
+* **Residuals vs. Leverage** helps to identify outliers. Cases falling inside the dotted region of the plot (Cook's Distance) may be outliers. In our plot, this isn't so much of a concern.
+
+```{r}
+par(mfrow = c(2, 2))
+plot(wrapperModelData)
+par(mfrow = c(1, 1))
+```
+
+## Chapter 10
+
+```{r}
+# Create a Day + Month variable
+ozoneForGam <-
+    ozoneClean %>%
+    mutate(DayOfYear = as.numeric(interaction(Date, Month))) %>%
+    select(-Date, -Month)
+
+# evidence for nonlinear relationship
+ggplot(ozoneForGam, aes(DayOfYear, Ozone)) +
+    geom_point() +
+    geom_smooth() +
+    geom_smooth(method = "lm", formula = "y ~ x + I(x^2)", col = "red") +
+    theme_bw()
+```
+
+Let's build a GAM model.
+
+```{r}
+# Define the task
+gamTask <- makeRegrTask(data = ozoneForGam, target = "Ozone")
+
+# Create imputation wrapper
+gamImputeWrapper <- makeImputeWrapper("regr.gamboost",
+                                      classes = list(numeric = imputeMethod))
+
+# Create feature selection wrapper
+gameFeatSelWrapper <- makeFeatSelWrapper(learner = gamImputeWrapper,
+                                         resampling = kFold,
+                                         control = featSelControl)
+```
+
+Let's cross-validate our model. The gamboost algorithm is quite computationally intense so for this excersei we're going to just use a holdout cross-validation strategy.
+
+```{r}
+holdout <- makeResampleDesc("Holdout")
+gamCV <- resample(gameFeatSelWrapper, gamTask, resampling = holdout)
+```
+
+Now let's train the model.
+
+```{r}
+parallelStartSocket(cpus = detectCores() - 1)
+
+gamModel <- train(gameFeatSelWrapper, gamTask)
+
+parallelStop()
+```
+
+## Understanding the GAM model
+
+All relationships look nonlinear (at least a little). Of course, GAMs always run the risk of overfitting. The *rug* of values at the bottom of the graph indicates the training data. We can see cases where there wasn't a lot of training data (danger of overfitting).
+
+Residuals still have some pattern indicating heteroskedasticity. We could try log-transforming Ozone or using a model which doesn't make this assumption. The quantile plot is pretty close to the diagonal line indicating an approximately normal distribution.
+
+```{r}
+# Have to use more.unwrap because our learner was a wrapper function itself
+gamModelData <- getLearnerModel(gamModel, more.unwrap = T)
+
+par(mfrow = c(3, 3))
+# create line plots for each function learned for each variable
+# shows how much each predictor contributes to ozone estimate across its values
+plot(gamModelData, type = "l")
+plot(gamModelData$fitted(), resid(gamModelData)) # residuals vs. fitted values
+qqnorm(resid(gamModelData)) # quantile-quantile plot
+qqline(resid(gamModelData))
+par(mfrow = c(1, 1))
+```
