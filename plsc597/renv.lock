@@ -37,6 +37,13 @@
       "Repository": "CRAN",
       "Hash": "3cb13b97961593b4a1ed0c8e37df9d9b"
     },
+    "Formula": {
+      "Package": "Formula",
+      "Version": "1.2-4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "cc8c8c4d61346cde1ca60030ff9c241f"
+    },
     "KernSmooth": {
       "Package": "KernSmooth",
       "Version": "2.23-18",
@@ -92,6 +99,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "e031418365a7f7a766181ab5a41a5716"
+    },
+    "RCurl": {
+      "Package": "RCurl",
+      "Version": "1.98-1.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "cf29e1b71f8736960e0e851123a83e6f"
     },
     "ROCR": {
       "Package": "ROCR",
@@ -506,6 +520,13 @@
       "Repository": "CRAN",
       "Hash": "611f9a55ad32ccfa17ccbd77be7a2804"
     },
+    "inum": {
+      "Package": "inum",
+      "Version": "1.0-3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "d08b69c9d7f12f7c814d1dd917236978"
+    },
     "ipred": {
       "Package": "ipred",
       "Version": "0.9-10",
@@ -569,6 +590,13 @@
       "Repository": "CRAN",
       "Hash": "4f337c8dcd7fdf0df89ee74c4f5d94d5"
     },
+    "libcoin": {
+      "Package": "libcoin",
+      "Version": "1.0-8",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "6ac98909743db51f64f2bd0d4434e086"
+    },
     "lifecycle": {
       "Package": "lifecycle",
       "Version": "0.2.0",
@@ -597,6 +625,13 @@
       "Repository": "CRAN",
       "Hash": "61e4a10781dd00d7d81dd06ca9b94e95"
     },
+    "mboost": {
+      "Package": "mboost",
+      "Version": "2.9-4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "964e7bd194f124cc1304580daa52875b"
+    },
     "mgcv": {
       "Package": "mgcv",
       "Version": "1.8-34",
@@ -610,6 +645,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "e87a35ec73b157552814869f45a63aa3"
+    },
+    "missMethods": {
+      "Package": "missMethods",
+      "Version": "0.2.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "2fcad076368f6e39b4d5d3039bbd0117"
     },
     "mlbench": {
       "Package": "mlbench",
@@ -639,6 +681,13 @@
       "Repository": "CRAN",
       "Hash": "6dfe8bf774944bd5595785e3229d8771"
     },
+    "mvtnorm": {
+      "Package": "mvtnorm",
+      "Version": "1.1-1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "69fa7331e7410c2a2cb3f9868513904f"
+    },
     "nlme": {
       "Package": "nlme",
       "Version": "3.1-152",
@@ -652,6 +701,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "b67ac021b3fb3a4b69d0d3c2bc049e9f"
+    },
+    "nnls": {
+      "Package": "nnls",
+      "Version": "1.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "e451f3c2946bae5c3e5b8d63f09d186e"
     },
     "numDeriv": {
       "Package": "numDeriv",
@@ -680,6 +736,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "7208dcf5492a90fe7f5faaee92323cc7"
+    },
+    "partykit": {
+      "Package": "partykit",
+      "Version": "1.2-13",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "2d0516d86a3b4af6345d4acd6572d02e"
     },
     "pillar": {
       "Package": "pillar",
@@ -764,6 +827,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "97def703420c8ab10d8f0e6c72101e02"
+    },
+    "quadprog": {
+      "Package": "quadprog",
+      "Version": "1.5-8",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "5f919ae5e7f83a6f91dcf2288943370d"
     },
     "randomForest": {
       "Package": "randomForest",
@@ -897,6 +967,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "3838071b66e0c566d55cc26bd6e27bf4"
+    },
+    "stabs": {
+      "Package": "stabs",
+      "Version": "0.6-4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "36f4eafcb1dc16d8035d7fe7967db2b8"
     },
     "stringi": {
       "Package": "stringi",
