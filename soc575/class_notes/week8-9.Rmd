@@ -1,0 +1,169 @@
+---
+title: "Week 8 Class Notes"
+output: html_document
+---
+
+https://stats.idre.ucla.edu/r/dae/multinomial-logistic-regression/
+
+* You can interpret using log of the odds.
+* A good way to think of multinomial logit models is that you are simultaneously estimating binary logits for all comparisons on your nominal outcome.
+
+```{r, warning = F, message = F}
+library(car)
+library(here)
+library(nnet)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(haven)
+library(broom)
+library(DAMisc)
+library(lmtest)
+library(mlogit)
+library(mnlogit)
+library(effects)
+library(forcats)
+library(ggplot2)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+```
+
+```{r}
+dataClean <-
+    data %>%
+    select(sex, bys55f, by2xrirr, byfaminc, matches("f2s30")) %>%
+    mutate(spt1 = as.character(sjlabelled::as_factor(f2s30aa)),
+           spt2 = as.character(sjlabelled::as_factor(f2s30ab)),
+           spt3 =as.character(sjlabelled::as_factor(f2s30bj)),
+           spt4 = as.character(sjlabelled::as_factor(f2s30bk)),
+           ex1 = as.character(sjlabelled::as_factor(f2s30ac)),
+           ex2 = as.character(sjlabelled::as_factor(f2s30ba)),
+           ex3 = as.character(sjlabelled::as_factor(f2s30bb)),
+           ex4 = as.character(sjlabelled::as_factor(f2s30bc)),
+           ex5 = as.character(sjlabelled::as_factor(f2s30bd)),
+           ex6 = as.character(sjlabelled::as_factor(f2s30be)),
+           ex7 = as.character(sjlabelled::as_factor(f2s30bf)),
+           ex8 = as.character(sjlabelled::as_factor(f2s30bg)),
+           ex9 = as.character(sjlabelled::as_factor(f2s30bh)),
+           ex10 = as.character(sjlabelled::as_factor(f2s30bi))) %>%
+    mutate(across(matches("spt[0-9]|ex[0-9]{1,2}"), ~na_if(.x, "1"))) %>%
+    mutate(across(matches("spt[0-9]|ex[0-9]{1,2}"), ~replace_na(.x, ""))) %>%
+    mutate(across(matches("spt[0-9]|ex[0-9]{1,2}"),
+                  ~as.character(fct_recode(.x,
+                                           "0" = "2", "1" = "3", "1" = "4", "1" = "5")))) %>%
+    rowwise() %>%
+    mutate(sport = max(spt1, spt2, spt3, spt4),
+           extra = max(ex1, ex2, ex3, ex4, ex5, ex6, ex7, ex8, ex9, ex10),
+           extra12 = case_when(sport == "1" & extra == "1" ~ "both",
+                               sport == "0" & extra == "0" ~ "noextra",
+                               sport == "1" & extra != "" ~ "sportonly",
+                               sport != "" & extra == "1" ~ "nonsportonly")) %>%
+    select(sex, bys55f, by2xrirr, byfaminc, extra12) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(sex = as.numeric(if_else(sex == 2, 0, as.numeric(sex))),
+           bys55f = as.numeric(bys55f),
+           by2xrirr = as.numeric(by2xrirr),
+           byfaminc = as.numeric(byfaminc),
+           extra12 = factor(extra12))
+```
+
+```{r}
+models <- map(list("nonsportonly", "noextra", "sportonly", "both"),
+              function(df, level) {
+                  df$extra12 <- relevel(df$extra12, ref = level)
+                  nnet::multinom(extra12 ~ ., data = df)},
+              df = dataClean)
+
+map(models, summary)
+
+pp <- fitted(models[[1]])
+pp2 <- fitted(models[[2]])
+
+avgp <- Effect(focal.predictors = c("bys55f", "sex", "byfaminc", "by2xrirr"),
+               models[[1]])
+
+modelPrediction <- pp %>% as_tibble() %>% bind_cols(dataClean)
+```
+
+```{r}
+maleVsFemale <- tibble(sex = c(0, 1),
+                       byfaminc = mean(dataClean$byfaminc),
+                       bys55f = mean(dataClean$bys55f),
+                       by2xrirr = mean(dataClean$by2xrirr))
+
+ppSex <-
+    predict(models[[1]], newdata = maleVsFemale, type = "probs") %>%
+    as_tibble() %>%
+    bind_cols(maleVsFemale)
+
+fighters <- tibble(sex = mean(dataClean$sex),
+                   byfaminc = mean(dataClean$byfaminc),
+                   bys55f = c(0, 1, 2),
+                   by2xrirr = mean(dataClean$by2xrirr))
+
+ppFight <-
+    predict(models[[1]], newdata = fighters, type = "probs") %>%
+    as_tibble() %>%
+    bind_cols(fighters)
+
+readScores <- tibble(sex = mean(dataClean$sex),
+                     byfaminc = mean(dataClean$byfaminc),
+                     bys55f = mean(dataClean$bys55f),
+                     by2xrirr = unique(dataClean$by2xrirr))
+
+ppReadScores <-
+    predict(models[[1]], newdata = readScores, type = "probs") %>%
+    as_tibble() %>%
+    bind_cols(readScores) %>%
+    pivot_longer(-c(sex, byfaminc, bys55f, by2xrirr))
+
+ggplot(ppReadScores, aes(x = by2xrirr, y = value)) +
+    geom_line(aes(group = name, color = name)) +
+    theme_bw()
+
+byFamInc <- tibble(sex = mean(dataClean$sex),
+                   byfaminc = unique(dataClean$byfaminc),
+                   bys55f = mean(dataClean$bys55f),
+                   by2xrirr = mean(dataClean$by2xrirr))
+
+ppFamInc <-
+    predict(models[[1]], newdata = byFamInc, type = "probs") %>%
+    as_tibble() %>%
+    bind_cols(byFamInc) %>%
+    pivot_longer(-c(sex, byfaminc, bys55f, by2xrirr))
+
+ggplot(ppFamInc, aes(x = byfaminc, y = value)) +
+    geom_point(aes(color = name)) +
+    geom_line(aes(group = name, color = name)) +
+    theme_bw()
+```
+
+Do your variables affect ANY of the outcomes? To test this, you hold out the variable and re-estimate the model and see if the variance explained changes in a significant fashion.
+
+```{r}
+# Hard Way
+model <- nnet::multinom(extra12 ~ ., data = dataClean)
+lrtest(model, "bys55f")
+lrtest(model, "byfaminc")
+lrtest(model, "sex")
+lrtest(model, "by2xrirr")
+
+# Easier Way, don't think I can do a Wald Test.
+# Well I think I could, would need to use mlogit or mnlogit
+modelDf <- broom::tidy(models[[1]], exponentiate = T)
+car::Anova(models[[1]])
+```
+
+Do your variables affect these specific two outcomes? Can my predictor distinguish between categories? If not, then they should be combined.
+
+```{r}
+# Appears to be using Wald Test for combining alternatives
+# I think I'd have to implement combination test manually for LR
+combTest(models[[1]])
+```
+
+https://stats.idre.ucla.edu/r/dae/multinomial-logistic-regression/
+https://bookdown.org/chua/ber642_advanced_regression/multinomial-logistic-regression.html

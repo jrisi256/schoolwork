@@ -1,0 +1,57 @@
+---
+title: "hw2"
+output: html_document
+---
+
+```{r}
+library(car)
+library(here)
+library(MASS)
+library(dplyr)
+library(haven)
+library(broom)
+library(effects)
+library(forcats)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+```
+
+```{r}
+dataClean <-
+    data %>%
+    mutate(trouble = as.factor(as.character(fct_recode(sjlabelled::as_factor(bys56e),
+                                                       "1" = "3",
+                                                       "3" = "1"))),
+           fight = as.factor(as.character(fct_recode(sjlabelled::as_factor(bys55f),
+                                                     "1" = "2"))),
+           praise = as.factor(as.character(fct_recode(sjlabelled::as_factor(bys59h),
+                                                      "1" = "2",
+                                                      "0" = "3",
+                                                      "0" = "4"))),
+           by2xrirr = as.numeric(by2xrirr)) %>%
+    select(trouble, fight, praise, by2xrirr) %>%
+    filter(across(everything(), ~!is.na(.x)))
+```
+
+```{r}
+model <- MASS::polr(trouble ~ ., data = dataClean)
+```
+
+```{r}
+summary(model)
+summaryDf <- broom::tidy(model, conf.int = T, exponentiate = T, p.value = T)
+car::poTest(model)
+```
+
+```{r}
+predict(model, newdata = select(dataClean, -trouble), "probs")
+```
+
+```{r}
+predictions <- Effect(focal.predictors = c("fight", "praise", "by2xrirr"),
+                      model)
+```
+

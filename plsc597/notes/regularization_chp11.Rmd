@@ -1,0 +1,291 @@
+---
+title: "Chp. 11 - Regularization"
+output: html_document
+---
+
+```{r}
+library(mlr)
+library(parallel)
+library(tidyverse)
+library(parallelMap)
+```
+
+```{r}
+data(Iowa, package = "lasso2")
+iowaTib <- as_tibble(Iowa)
+```
+
+Notice in the plots that because we don't have a lot of data if we removed some of the cases the slopes of some of these relationships could very easily shift.
+
+```{r}
+iowaUntidy <-
+    pivot_longer(iowaTib,
+                 cols = -Yield,
+                 names_to = "Variable",
+                 values_to = "Value")
+
+ggplot(iowaUntidy, aes(Value, Yield)) +
+    facet_wrap(~ Variable, scale = "free_x") +
+    geom_point() +
+    geom_smooth(method = "lm") +
+    theme_bw()
+```
+
+Create our task and learner. Notice we set the value of alpha equal to 0 this is how we specify we want to use pure ridge regression with glmnet. We also supply an argument for the id argument. The id argument lets us supply a unique name to every learner. Because we create each of our learner with the same glmnet function, we have to uniquely identify each of them.
+
+```{r}
+iowaTask <- makeRegrTask(data = iowaTib, target = "Yield")
+ridge <- makeLearner("regr.glmnet", alpha = 0, id = "ridge")
+```
+
+Let's see how much each independent variable contributes to the model's ability to predict Yield. We can use the Filter Methods we learned about in Chapter 9 to assess predictive power of the features.
+
+```{r}
+filterVals <- generateFilterValuesData(iowaTask)
+plotFilterValues(filterVals) + theme_bw()
+```
+
+Now let's tune our lambda hyperparameter. A little inside baseball here. We're tuning the *s* parameter. The glmnet package has its own *lambda* argument, but you should supply your own range of lambda values when using it. You should use the *s* hyperparameter when training a model for a single, specific value of lambda.
+
+We are going to do 200 random iterations between 0 and 15 for the value of lambda. We will also use 3-fold cross-validation repeated 10 times. This means we're training 3 models * 10 times * 200 iterations = 6000 different models trained. So basically...
+
+* Randomly partition the dataset into 10 sets of 3 chunks.
+* For each i from 1 to 200
+    * Choose a lambda value randomly.
+    * For each chunk (1 through 10)
+        * Perform 3-fold cross validation and return results of all 3 models.
+* Return best performing model from all possible 6000 models and its lambda value.
+    
+```{r}
+ridgeParamSpace <- makeParamSet(makeNumericParam("s", lower = 0, upper = 15))
+randSearch <- makeTuneControlRandom(maxit = 200)
+cvForTuning <- makeResampleDesc("RepCV", folds = 3, reps = 10)
+
+parallelStartSocket(cpus = detectCores() - 1)
+
+tunedRidgePars <- tuneParams(ridge,
+                             task = iowaTask,
+                             resampling = cvForTuning,
+                             par.set = ridgeParamSpace,
+                             control = randSearch)
+
+parallelStop()
+```
+
+How can we be sure we looked over a large enough range of lambda values? Let's plot the best mean squared error for each of the lambda values. We see as we tune the parameter past 10 we get worsening values suggesting 15 was high enough. We always need to be careful though we aren't stuck in some local minimum however.
+
+```{r}
+ridgeTuningData <- generateHyperParsEffectData(tunedRidgePars)
+plotHyperParsEffect(ridgeTuningData,
+                    x = "s",
+                    y = "mse.test.mean",
+                    plot.type = "line")
+```
+
+Let's train our model using that value of the hyperparameter lambda.
+
+```{r}
+tunedRidge <- setHyperPars(ridge, par.vals = tunedRidgePars$x)
+tunedRidgeModel <- train(tunedRidge, iowaTask)
+```
+
+Let's extract the coefficients. Important to note that glmnet automatically scales our predictors by default for us. **Remember** the parameter estimates are transformed back onto the variables' original scale.
+
+```{r}
+ridgeModelData <- tunedRidgeModel$learner.model
+ridgeCoefs <- coef(ridgeModelData, s = tunedRidgePars$x$s)
+```
+
+Let's compare our coefficients to a regular OLS model.
+
+```{r}
+lmCoefs <- coef(lm(Yield ~., data = iowaTib))
+coefTib <- tibble(Coef = rownames(ridgeCoefs)[-1],
+                  Ridge = as.vector(ridgeCoefs)[-1],
+                  Lm = as.vector(lmCoefs)[-1])
+coefUntidy <- pivot_longer(coefTib,
+                           -Coef,
+                           names_to = "Model",
+                           values_to = "Beta")
+
+ggplot(coefUntidy, aes(reorder(Coef, Beta), Beta, fill = Model)) +
+    geom_bar(stat = "identity", col = "black") +
+    facet_wrap(~Model) +
+    theme_bw() +
+    theme(legend.position = "none")
+```
+
+## Train the LASSO model
+
+Set alpha to 1 to signal we are using LASSO. Then we're going to tune LASSO the same way we tuned ridge regression.
+
+```{r}
+lasso <- makeLearner("regr.glmnet", alpha = 1, id = "lasso")
+
+lassoParamSpace <- makeParamSet(makeNumericParam("s", lower = 0, upper = 15))
+
+parallelStartSocket(cpus = detectCores())
+tunedLassoPars <- tuneParams(lasso,
+                             task = iowaTask,
+                             resampling = cvForTuning,
+                             par.set = lassoParamSpace,
+                             control = randSearch)
+parallelStop()
+```
+
+Let's plot again so we can see if we need to expand our search. It appears as if we've found our local minimum. Notice as we tune our parameter higher and higher it begins to remove independent variables and we wind up with an intercept-only model.
+
+```{r}
+lassoTuningData <- generateHyperParsEffectData(tunedLassoPars)
+plotHyperParsEffect(lassoTuningData,
+                    x = "s",
+                    y = "mse.test.mean",
+                    plot.type = "line") +
+    theme_bw()
+```
+
+Train the model.
+
+```{r}
+tunedLasso <- setHyperPars(lasso, par.vals = tunedLassoPars$x)
+tunedLassoModel <- train(tunedLasso, iowaTask)
+```
+
+Let's compare the coefficients to our ridge and OLS models.
+
+```{r}
+lassoModelData <- tunedLassoModel$learner.model
+lassoCoefs <- coef(lassoModelData, s = tunedLassoPars$x$s)
+coefTib$LASSO <- as.vector(lassoCoefs)[-1]
+
+coefUntidy <- pivot_longer(coefTib,
+                           -Coef,
+                           names_to = "Model",
+                           values_to = "Beta")
+
+ggplot(coefUntidy, aes(reorder(Coef, Beta), Beta, fill = Model)) +
+    geom_bar(stat = "identity", col = "black") +
+    facet_wrap(~ Model) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    coord_flip()
+```
+
+## Let's train our elastic net model
+
+```{r}
+elastic <- makeLearner("regr.glmnet", id = "elastic")
+```
+
+We are tuning two hyperparameters now. The basic framework for tuning the hyperparameters remains the same though.
+
+```{r}
+elasticParamSpace <-
+    makeParamSet(makeNumericParam("s", lower = 0, upper = 10),
+                 makeNumericParam("alpha", lower = 0, upper = 1))
+
+randSearchElastic <- makeTuneControlRandom(maxit = 400)
+
+parallelStartSocket(cpus = detectCores())
+tunedElasticPars <- tuneParams(elastic,
+                               task = iowaTask,
+                               resampling = cvForTuning,
+                               par.set = elasticParamSpace,
+                               control = randSearchElastic)
+
+parallelStop()
+```
+
+Let's plot the tuning process to see if our search space was large enough. We are going to be plotting in 3-dimensions now. In order to draw in three dimensions, we need to fill in the gaps in our search space. For this example, we use k-nearest neighbors to fill in the gaps based on the MSE values of the nearest search iterations. Basically color in missing values based on nearby values.
+
+```{r}
+elasticTuningData <- generateHyperParsEffectData(tunedElasticPars)
+
+plotHyperParsEffect(elasticTuningData,
+                    x = "s",
+                    y = "alpha",
+                    z = "mse.test.mean",
+                    interpolate = "regr.kknn",
+                    plot.type = "heatmap") +
+    geom_point(x = tunedElasticPars$x$s,
+               y = tunedElasticPars$x$alpha,
+               col = "white") +
+    theme_bw()
+
+plotHyperParsEffect(elasticTuningData,
+                    x = "s",
+                    y = "alpha",
+                    z = "mse.test.mean",
+                    interpolate = "regr.kknn",
+                    plot.type = "contour",
+                    show.experiments = T) +
+    geom_point(x = tunedElasticPars$x$s,
+               y = tunedElasticPars$x$alpha,
+               col = "white") +
+    theme_bw()
+
+plotHyperParsEffect(elasticTuningData,
+                    x = "s",
+                    y = "alpha",
+                    z = "mse.test.mean",
+                    plot.type = "scatter") +
+    geom_point(x = tunedElasticPars$x$s,
+               y = tunedElasticPars$x$alpha,
+               col = "white") +
+    theme_bw()
+```
+
+Train our model.
+
+```{r}
+tunedElastic <- setHyperPars(elastic, par.vals = tunedElasticPars$x)
+tunedElasticModel <- train(tunedElastic, iowaTask)
+```
+
+Extract model coefficients and plot them.
+
+```{r}
+elasticModelData <- tunedElasticModel$learner.model
+elasticCoefs <- coef(elasticModelData, s = tunedElasticPars$x$s)
+coefTib$Elastic <- as.vector(elasticCoefs)[-1]
+
+coefUntidy <- pivot_longer(coefTib,
+                           -Coef,
+                           names_to = "Model",
+                           values_to = "Beta")
+
+ggplot(coefUntidy, aes(reorder(Coef, Beta), Beta, fill = Model)) +
+    geom_bar(stat = "identity", position = "dodge", col = "black") +
+    facet_wrap(~Model) +
+    theme_bw() +
+    coord_flip()
+```
+
+## Benchmark our results
+
+Benchmarking takes a list of learners, a task, and cross-validation procedure. For each iteration/fold of the cross-validation procedure, a model is trained using each learner on the same training set and evaluated on the same test set. Once the entire cross-validation process is complete, we get the mean performance metrice (MSE) allowing us to compare.
+
+```{r}
+ridgeWrapper <- makeTuneWrapper(ridge,
+                                resampling = cvForTuning,
+                                par.set = ridgeParamSpace,
+                                control = randSearch)
+
+lassoWrapper <- makeTuneWrapper(lasso,
+                                resampling = cvForTuning,
+                                par.set = lassoParamSpace,
+                                control = randSearch)
+
+elasticWrapper <- makeTuneWrapper(elastic,
+                                  resampling = cvForTuning,
+                                  par.set = elasticParamSpace,
+                                  control = randSearchElastic)
+
+learners = list(ridgeWrapper, lassoWrapper, elasticWrapper, "regr.lm")
+
+kFold3 <- makeResampleDesc("CV", iters = 3)
+
+parallelStartSocket(cpus = detectCores())
+bench <- benchmark(learners, iowaTask, kFold3)
+parallelStop()
+```
