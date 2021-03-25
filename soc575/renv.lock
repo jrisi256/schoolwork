@@ -191,6 +191,13 @@
       "Repository": "CRAN",
       "Hash": "644043219fc24e190c2f620c1a380a69"
     },
+    "base64enc": {
+      "Package": "base64enc",
+      "Version": "0.1-3",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "543776ae6848fde2f48ff3816d0628bc"
+    },
     "boot": {
       "Package": "boot",
       "Version": "1.3-27",
@@ -494,10 +501,10 @@
     },
     "here": {
       "Package": "here",
-      "Version": "0.1",
+      "Version": "1.0.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "2c0406b8e0a4c3516ab37be62da74e3c"
+      "Hash": "24b224366f9c2e7534d2344d10d59211"
     },
     "highr": {
       "Package": "highr",
@@ -515,10 +522,10 @@
     },
     "htmltools": {
       "Package": "htmltools",
-      "Version": "0.4.0",
+      "Version": "0.5.1.1",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "2d7691222f82f41e93f6d30f169bd5e1"
+      "Hash": "af2c2531e55df5cf230c4b5444fc973c"
     },
     "htmlwidgets": {
       "Package": "htmlwidgets",
@@ -683,10 +690,10 @@
     },
     "maxLik": {
       "Package": "maxLik",
-      "Version": "1.4-6",
+      "Version": "1.4-8",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "48b777057f2aa9539028284e98fafdbd"
+      "Hash": "86dd402728e96ac53f6e3d28c210103b"
     },
     "mgcv": {
       "Package": "mgcv",
@@ -991,10 +998,10 @@
     },
     "rprojroot": {
       "Package": "rprojroot",
-      "Version": "1.3-2",
+      "Version": "2.0.2",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "f6a407ae5dd21f6f80a6708bbb6eb3ae"
+      "Hash": "249d8cd1e74a8f6a26194a91b47f21d1"
     },
     "rstan": {
       "Package": "rstan",
@@ -1096,10 +1103,10 @@
     },
     "tinytex": {
       "Package": "tinytex",
-      "Version": "0.20",
+      "Version": "0.30",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "d2cef450cbbf081b4a2ef1067fae9f32"
+      "Hash": "066f49a225dc3215cb1f32bc23535f88"
     },
     "ucminf": {
       "Package": "ucminf",
