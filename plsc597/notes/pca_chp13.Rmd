@@ -1,0 +1,89 @@
+---
+title: "PCA - Chp. 13"
+output: html_document
+---
+
+```{r}
+library(mclust)
+library(GGally)
+library(tidyverse)
+library(factoextra)
+```
+
+```{r}
+data(banknote, package = "mclust")
+swissTib <- as_tibble(banknote)
+```
+
+```{r}
+ggpairs(swissTib, mapping = aes(col = Status)) + theme_bw()
+```
+
+Please note pca cannot handle categorical variables and thus needs to be transformed into numeric dummy variables. What does the printout from our pca model mean?
+
+* **Standard deviations**: A vector of the standard deviations of the data along each of the principal components. To convert them to their eigenvalues (variance) we just have to square them.
+* **Rotation**: This contains the six eigenvectors. They describe how far along each original variable we have to go so that we're one unit away from the origin.
+* **Proportion of Variance**: This tells us how much of the total variance is accounted for by each principal component. This is calculated by dividing each eigenvalue by the sum of the eigenvalues.
+
+```{r}
+pca <- select(swissTib, -Status) %>% prcomp(center = T, scale = T)
+summayr(pca)
+```
+
+If we're interested in interpreting our principal components, it's useful to extract the variable loadings. Variable loadings tell us how much each of the original variables correlates with each of the principal components.
+The formula is: variable loadings = eigenvector * sqrt(eigenvalue).
+
+```{r}
+eigenvector <- as_tibble(pca$rotation)
+
+variableLoadings <-
+    pmap_dfc(list(eigenvector, pca$sdev),
+             function(vector, eigenvalue) {vector * eigenvalue})
+```
+
+The resulting Matrix are Pearson correlation coefficients. E.g. cases with a large component score for PC2 have a very small length (large negative correlation).
+
+An easier way to do what we just did is to use the coord component of the pcaDat object.
+
+```{r}
+pcaDat <- get_pca(pca)
+
+# only label the variables and not each case with its row number
+fviz_pca_biplot(pca, label = "var") 
+```
+
+We just plotted a biplot. It's a common method for simultaneously plotting component scores and variable loadings for the first two principal components. The dots show the component scores for each of the observations (plotted against the first two components), and the arrows indicate the variable loadings of each variable. The plot shows us we have two clusters of data and the arrows helps us see which variables tend to correlate with which clusters.
+
+```{r}
+fviz_pca_var(pca)
+```
+
+This is a variable loading plot. It shows the same variable loadings as the biplot, but now the axes represent the correlation of each of the variables with each principal component. It's basically our matrix we calculated earlier.
+
+```{r}
+fviz_screeplot(pca, addlabels = T, choice = "eigenvalue")
+fviz_screeplot(pca, addlabels = T, choice = "variance")
+```
+
+This draws a scree plot. It's a common way of plotting the principal components against the amount of variance they explain. Helps us determine how many principal components to retain. There are a few rules of thumb for how many to keep. One is keep all components which cumulatively explain 80% of the variance or all with eigenvalues above 1 (keeping all eigenvalues with more information than the average since the average is always 1).
+
+It's ultimately a bit subjective how much information you're willing to lose. You can use automated feature selection in conjunction with an ML algorithm to determine the optimal amount for predictive power.
+
+```{r}
+swissPca <- swissTib %>% mutate(PCA1 = pca$x[, 1], PCA2 = pca$x[, 2])
+
+ggplot(swissPca, aes(PCA1, PCA2, col = Status)) +
+    geom_point() +
+    theme_bw()
+```
+
+```{r}
+newBanknotes <- tibble(Length = c(214, 216),
+                       Left = c(130, 128),
+                       Right = c(132, 129),
+                       Bottom = c(12, 7),
+                       Top = c(12, 8),
+                       Diagonal = c(138, 142))
+
+predict(pca, newBanknotes)
+```
