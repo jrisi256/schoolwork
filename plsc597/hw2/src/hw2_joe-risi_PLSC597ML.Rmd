@@ -1,0 +1,55 @@
+---
+title: 'HW2 - Joe Risi - PLSC 597: Machine Learning'
+output: html_document
+---
+
+## Introduction and Replication - Question 1
+
+Harvard Dataverse Link - https://doi.org/10.7910/DVN/OSSD8O  
+JSTOR Stable Link to Paper - https://www.jstor.org/stable/42940606  
+Link to github repository - https://github.com/jrisi256/schoolwork/tree/main/plsc597/hw2/src
+
+### Introduction - Is Immigration a Racial Issue? Anglo Attitudes on Immigration Policies in a Border County.
+
+* The purpose of the study is to assess the association between Anglo aversion to Latinos and a variety of other factors including: physical proximity to Latinos, contact with ethnic minorities, and expressed preferences for immigration policies.
+* The underlying hypothesis argues immigration policy preferences are strongly influenced by racial resentment rather than other considerations like economic anxiety.
+* Other hypotheses argue Anglos living in neighborhoods with larger proportions of Latinos will harbor more restrictive attitudes on immigration, but Anglos who interact more frequently with minorities will harbor less restrictive attitudes on immigration.
+
+### Data and Methods
+
+* Data was collected through a telephone survey using random-digit-dial procedures in San Diego County, California in 2005 - 2006. Data were weighted in all regressions to represent San Diego County demographic characteristics for Anglos based on US Census estimates. No significant differences appeared in conclusions when analyses were replicated using unweighted values.
+* **Dependent Variable**: The dependent variable of interest was survey respondents' answers to the amnesty question: "As you may know, in 1986 the US Congress passed the Immigration Reform and Control Act, which granted amnesty to nearly 2 million persons who had lived continuously in this country for four or more years without proper documentation. This amnesty law allowed these immigrants to remain here as permanent residents and to apply for US citizenship. At this time, do you think repeating this amnesty program would be a good thing?" 0 = bad idea, 1 = good idea.
+* **Independent Variables**
+    * Respondent aversion to Latinos (attitude about Latinos): Measured using the Bogardus scale which is a composite index to detect racial attitudes. Recoded as a dummy variable where 1 means aversion was detected and 0 means no aversion was detected.
+    * Latino context (concentration in the same Census tract): The natural log of the percent of Latino residents within each respondent's Census tract.
+    * Reported contact with minorities: Composite scale summarizing interactions respondents had with Latinos.
+* **Controls**
+    * Personal financial situation; "In terms of your personal economic situation, would you say that it has improved, remained the same, or gotten worse over the past 12 months?"
+    * Family Income.
+    * Age.
+    * Education.
+    * Gender.
+    * Political Ideology: "Would you consider yourself conservative, moderate, or liberal?" Liberals were coded as low and conservatives as high.
+* **Codebook**
+    * Amnesty = amnesty
+    * Latino Aversion = dishis2
+    * Latino context = pcthis2
+    * Latino contact = contact
+    * Personal financial situation = retecon
+    * Political ideology = idea
+    * Education = edu2
+    * Famliy Income = income
+    * Age = age
+    * Sex = male
+* **Results**
+    * Age, gender, and personal financial situation are not statistically significant. In contrast to the their hypothesis, Latino aversion was not statistically significant either.
+    * Increased minority contact was positively associated with amnesty however it was only marginally significant.
+    * Decreased income was negatively associated with amnesty however it was only marginally significant.
+    * Latino context was negatively and statistically significantly associated with amnesty meaning the more Latinos living in your Census tract the more likely you were to view amnesty as a bad thing.
+    * Increased education was positively and statistically significantly associated with amnesty.
+    * As one became more conservative, the probability of supporting amnesty decreased. Highly statistically significant.
+
+```{r}
+
+```
+
