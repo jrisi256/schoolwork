@@ -5,19 +5,26 @@ output: html_document
 
 ```{r}
 library(car)
+library(nnet)
 library(here)
 library(MASS)
 library(dplyr)
 library(haven)
 library(broom)
+library(purrr)
+library(tidyr)
+library(DAMisc)
 library(effects)
 library(forcats)
+library(ggplot2)
 library(sjlabelled)
 ```
 
 ```{r}
 data <- haven::read_dta(here("class data.dta"))
 ```
+
+## Question 1
 
 ```{r}
 dataClean <-
@@ -55,3 +62,111 @@ predictions <- Effect(focal.predictors = c("fight", "praise", "by2xrirr"),
                       model)
 ```
 
+## Question 3
+
+```{r}
+dataClean2 <-
+    data %>%
+    select(f4gmrs, byparmar, byfaminc, sex) %>%
+    mutate(byparmar = as.factor(as.character(fct_recode(sjlabelled::as_character(byparmar),
+                                                        "notmarried" = "divorced",
+                                                        "notmarried" = "widowed",
+                                                        "notmarried" = "separated",
+                                                        "notmarried" = "never married",
+                                                        "married" = "married",
+                                                        "married" = "marriage-like relat"))),
+           mar = as.factor(as.character(fct_recode(sjlabelled::as_character(f4gmrs),
+                                                   "oncemarried" = "divorced",
+                                                   "oncemarried" = "widowed",
+                                                   "oncemarried" = "separated",
+                                                   "married" = "in marriage-like relationship",
+                                                   "notmarried" = "single, never married",))),
+           sex = as.numeric(sex),
+           byfaminc = as.numeric(byfaminc),
+           mar = relevel(mar, ref = "notmarried"),
+           byparmar = as.numeric(byparmar)) %>%
+    select(-f4gmrs) %>%
+    filter(across(everything(), ~!is.na(.)))
+```
+
+```{r}
+model2 <- multinom(mar ~ ., data = dataClean2)
+summary(model2)
+
+models2 <- map(list("oncemarried", "married", "notmarried"),
+               function(df, level) {
+                   df$mar <- relevel(df$mar, ref = level)
+                   nnet::multinom(mar ~ ., data = df)},
+               df = dataClean2)
+```
+
+```{r}
+tidyModels2 <- map(models2, tidy, exponentiate = T)
+car::Anova(models2[[1]])
+DAMisc::combTest(models2[[1]])
+```
+
+```{r}
+byparmarDf <- tibble(sex = mean(as.numeric(dataClean2$sex)),
+                     byfaminc = mean(dataClean2$byfaminc),
+                     byparmar = unique(dataClean2$byparmar))
+
+ppByparmar <-
+    predict(models2[[1]], newdata = byparmarDf, type = "probs") %>%
+    as_tibble() %>%
+    bind_cols(byparmarDf) %>%
+    pivot_longer(-c(sex, byfaminc, byparmar))
+
+ggplot(ppByparmar, aes(x = byparmar, y = value)) +
+    geom_point(aes(color = name)) +
+    geom_line(aes(group = name, color = name)) +
+    theme_bw() +
+    theme(plot.title = element_text(size = 10)) +
+    labs(y = "Probability",
+         color = "f4gmrs (Current Relationship Status)",
+         title = "Predicted Probabilities of Current Relationship Status by Parents' Relationship Status") +
+    scale_x_continuous(breaks = 1:2, labels = c("Married", "Not Married"))
+```
+
+```{r}
+byfamincDf <- tibble(sex = mean(as.numeric(dataClean2$sex)),
+                     byfaminc = unique(dataClean2$byfaminc),
+                     byparmar = mean(as.numeric(dataClean2$byparmar)))
+
+ppByfaminc <-
+    predict(models2[[1]], newdata = byfamincDf, type = "probs") %>%
+    as_tibble() %>%
+    bind_cols(byfamincDf) %>%
+    pivot_longer(-c(sex, byfaminc, byparmar))
+
+ggplot(ppByfaminc, aes(x = byfaminc, y = value)) +
+    geom_point(aes(color = name)) +
+    geom_line(aes(group = name, color = name)) +
+    theme_bw() +
+    theme(plot.title = element_text(size = 10)) +
+    labs(y = "Probability",
+         color = "f4gmrs (Current Relationship Status)",
+         title = "Predicted Probabilities of Current Relationship Status by Family Income")
+```
+
+```{r}
+bysexDf <- tibble(sex = unique(dataClean2$sex),
+                  byfaminc = mean(dataClean2$byfaminc),
+                  byparmar = mean(as.numeric(dataClean2$byparmar)))
+
+ppBysex <-
+    predict(models2[[1]], newdata = bysexDf, type = "probs") %>%
+    as_tibble() %>%
+    bind_cols(bysexDf) %>%
+    pivot_longer(-c(sex, byfaminc, byparmar))
+
+ggplot(ppBysex, aes(x = sex, y = value)) +
+    geom_point(aes(color = name)) +
+    geom_line(aes(group = name, color = name)) +
+    theme_bw() +
+    theme(plot.title = element_text(size = 10)) +
+    labs(y = "Probability",
+         color = "f4gmrs (Current Relationship Status)",
+         title = "Predicted Probabilities of Current Relationship Status by Sex") +
+    scale_x_continuous(breaks = 1:2, labels = c("Male", "Female"))
+```
