@@ -1241,6 +1241,13 @@
       "Repository": "CRAN",
       "Hash": "e53c0258e2d126419df25e5390082819"
     },
+    "reghelper": {
+      "Package": "reghelper",
+      "Version": "1.0.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "774d665fe9002ec2829e20d96c109a36"
+    },
     "rematch": {
       "Package": "rematch",
       "Version": "1.0.1",
