@@ -49,7 +49,169 @@ Link to github repository - https://github.com/jrisi256/schoolwork/tree/main/pls
     * Increased education was positively and statistically significantly associated with amnesty.
     * As one became more conservative, the probability of supporting amnesty decreased. Highly statistically significant.
 
-```{r}
+### Packages
 
+```{r, warning = F, message = F}
+library(mlr)
+library(here)
+library(dplyr)
+library(caret)
+library(foreign)
+library(parallel)
+library(neuralnet)
+library(parallelMap)
+```
+
+### Read in the data
+
+```{r}
+ssq <- foreign::read.dta(here("hw1/data/ssq.dta"))
+```
+
+### Light data cleaning
+
+Select only relevant columns for the regression and remove all rows with a missing value on any of the variables. Turn all variables into numeric values (to match the results from the paper).
+
+```{r}
+X2 <-
+    ssq %>%
+    select(amnesty, dishis2, pcthis2, contact, retecon, idea, edu2, income2,
+           age, male, wteth) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(across(everything(), as.numeric)) %>%
+    mutate(amnesty = as.factor(amnesty))
+```
+
+### Estimate regression
+
+```{r}
+# Make the learning task
+amnestyTaskPaper <- makeClassifTask(data = select(X2, -wteth),
+                                    target = "amnesty",
+                                    weights = X2$wteth)
+
+# Create a logistic regression learner
+logRegLearner <- makeLearner("classif.logreg", predict.type = "prob")
+
+# Train or fit the model on the whole dataset
+amnestyModelPaper <- train(logRegLearner, amnestyTaskPaper)
+summary(amnestyModelPaper$learner.model)
+```
+
+![Regression Results from Paper](../../hw1/src/replication.png)
+
+## Question 2
+
+### Create test and train
+
+```{r}
+set.seed(420)
+split <- createDataPartition(X2$amnesty, p = 0.8, list = F, times = 1)
+train = X2[split,]
+test = X2[-split,]
+```
+
+### Set-up our training task, learners, and cross-validation strategy
+
+It should be noted these algorithms do not use survey weights in contrast to logistic regression.
+
+```{r}
+# Make the training task
+amnestyTaskTrain <- makeClassifTask(data = select(train, -wteth),
+                                    target = "amnesty")
+
+# Create our learners
+svm <- makeLearner("classif.svm")
+randforest <- makeLearner("classif.randomForest", importance = T)
+neuralnet <- makeLearner("classif.neuralnet")
+
+# We will be using 10-fold cross-validation for hyperparameter tuning
+kFold10 <- makeResampleDesc("CV", iters = 10)
+
+# Explore 100 different combos of hyperparameters for SVM
+randSearchSvm <- makeTuneControlRandom(maxit = 100)
+
+# Explore 1000 different combos of hyperparameters for random forest
+randSearchRf <- makeTuneControlRandom(maxit = 1000)
+
+# Explore 500 different combos of hyperparameters for neural net
+randSearchNn <- makeTuneControlRandom(maxit = 50)
+```
+
+### Tune the hyperparamters for the support vector machine
+
+```{r, warning = F, message = F}
+svmParamSpace <- makeParamSet(
+    makeDiscreteParam("kernel", values = c("polynomial", "radial", "sigmoid")),
+    makeIntegerParam("degree", lower = 1, upper = 3),
+    makeNumericParam("cost", lower = 0.1, upper = 10),
+    makeNumericParam("gamma", lower = 0.1, upper = 10))
+
+ptm <- proc.time()
+
+tunedSvm <- tuneParams(svm,
+                       task = amnestyTaskTrain,
+                       resampling = kFold10,
+                       par.set = svmParamSpace,
+                       control = randSearchSvm,
+                       measures = list(acc, fpr, fnr))
+
+proc.time() - ptm
+```
+
+### Tune the hyperparameters for random forest
+
+```{r, warning = F, message = F}
+forestParamSpace <-
+    makeParamSet(makeIntegerParam("ntree", lower = 200, upper = 200),
+                 makeIntegerParam("mtry", lower = 5, upper = 10),
+                 makeIntegerParam("nodesize", lower = 1, upper = 10),
+                 makeIntegerParam("maxnodes", lower = 5, upper = 30))
+
+ptm <- proc.time()
+
+parallelStartSocket(cpus = detectCores())
+
+tunedRandForest <- tuneParams(randforest,
+                              task = amnestyTaskTrain,
+                              resampling = kFold10,
+                              par.set = forestParamSpace,
+                              control = randSearchRf,
+                              measures = list(acc, fpr, fnr))
+
+parallelStop()
+
+proc.time() - ptm
+```
+
+### Tune the hyperparameters for the neural network
+
+```{r, warning = F, message = F}
+neuralNetParamSpace <-
+    makeParamSet(makeNumericParam("threshold", lower = 0.7, upper = 0.7),
+                 makeDiscreteParam("algorithm", values = c("rprop+")),
+                 makeDiscreteParam("act.fct", values = c("logistic")),
+                 makeIntegerVectorParam("hidden", len = 3, lower = 1, upper = 2))
+
+ptm <- proc.time()
+
+tunedNeuralNet <- tuneParams(neuralnet,
+                             task = amnestyTaskTrain,
+                             resampling = kFold10,
+                             par.set = neuralNetParamSpace,
+                             control = randSearchNn,
+                             measures = list(acc, fpr, fnr))
+
+proc.time() - ptm
+```
+
+### Compare the cross-validation performances of the 3 algorithms
+
+Looking at accuracy, the false positive rate, and the false negative rate 
+
+```{r}
+tunedSvm
+tunedRandForest
+tunedNeuralNet
 ```
 
