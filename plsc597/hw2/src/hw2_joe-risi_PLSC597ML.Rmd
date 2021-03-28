@@ -104,11 +104,17 @@ summary(amnestyModelPaper$learner.model)
 
 ### Create test and train
 
+We scale our variables for use with the neural network and SVM (although SVM does it automatically I believe, it's OK we do it manually). Results don't need to be scaled for the random forest, but it shouldn't change the substantive findings.
+
 ```{r}
 set.seed(420)
 split <- createDataPartition(X2$amnesty, p = 0.8, list = F, times = 1)
+
 train = X2[split,]
 test = X2[-split,]
+
+scaleTrain <- train %>% mutate(across(c(-wteth, -amnesty), ~as.numeric(scale(.x))))
+scaleTest <- test %>% mutate(across(c(-wteth, -amnesty), ~as.numeric(scale(.x))))
 ```
 
 ### Set-up our training task, learners, and cross-validation strategy
@@ -117,7 +123,7 @@ It should be noted these algorithms do not use survey weights in contrast to log
 
 ```{r}
 # Make the training task
-amnestyTaskTrain <- makeClassifTask(data = select(train, -wteth),
+amnestyTaskTrain <- makeClassifTask(data = select(scaleTrain, -wteth),
                                     target = "amnesty")
 
 # Create our learners
@@ -149,12 +155,16 @@ svmParamSpace <- makeParamSet(
 
 ptm <- proc.time()
 
+parallelStartSocket(cpus = detectCores())
+
 tunedSvm <- tuneParams(svm,
                        task = amnestyTaskTrain,
                        resampling = kFold10,
                        par.set = svmParamSpace,
                        control = randSearchSvm,
                        measures = list(acc, fpr, fnr))
+
+parallelStop()
 
 proc.time() - ptm
 ```
@@ -191,7 +201,7 @@ neuralNetParamSpace <-
     makeParamSet(makeNumericParam("threshold", lower = 0.7, upper = 0.7),
                  makeDiscreteParam("algorithm", values = c("rprop+")),
                  makeDiscreteParam("act.fct", values = c("logistic")),
-                 makeIntegerVectorParam("hidden", len = 3, lower = 1, upper = 2))
+                 makeIntegerVectorParam("hidden", len = 4, lower = 1, upper = 5))
 
 ptm <- proc.time()
 
