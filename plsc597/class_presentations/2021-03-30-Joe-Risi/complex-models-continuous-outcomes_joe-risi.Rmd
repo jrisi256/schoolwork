@@ -260,7 +260,7 @@ ggplot(xgbData$evaluation_log, aes(iter, train_rmse)) +
 
 As a reminder, we will be using MSE (mean square error) to evaluate peformance.
 
-$\sqrt{\frac{1}{n}\sum_{i=1}^n(Y_i - \hat{Y_i}^2)}$
+$\sqrt{\frac{1}{n}\sum_{i=1}^n(Y_i - \hat{Y_i})^2}$
 
 ```{r}
 predictOls <-
