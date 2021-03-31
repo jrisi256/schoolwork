@@ -1,31 +1,4 @@
----
-title: "2021 March 30 - Joseph Risi - Complex Models for Continuous Outcomes"
-output: html_document
----
-
-* http://ippsr.msu.edu/public-policy/correlates-state-policy - Link to the **Correlates of State Public Policy** website. The aim of the project is to be a *one-stop shop* for researchers looking to track policy changes and state-level variables over time. The dataset is quite extensive as it has thousands of variables for each state (in some cases going back as far as 1900).
-* https://ippsr.msu.edu/sites/default/files/CorrelatesCodebook.pdf - Link to the variable codebook which contains somewhat detailed information on every variable in the dataset.
-* https://github.com/correlatesstatepolicy/cspp - Link to the Github repository for the R package allowing for access to the dataset.
-* https://cspp.ippsr.msu.edu/cspp/#tab-9832-5 - Link to a Shiny app the researchers built allowing for interactive exploration and search of the dataset.
-
-The goal of this presentation will be to build a model which can predict infant mortality. While infant health is not my area of expertise or research, I picked variables I thought were either interesting or somehow related to infant mortality.
-
-**The Variables**
-
-* **Dependent Variable**: Infant Mortality Rate which is measured as the number of infant deaths per 1000 live birth. This measure is available for every state from 1995 - 2005 and then from 2014 - 2017.
-* **Independent Variables**: For some of these variables, it's unclear to me exactly how the rate is being calculated. If I were to pursue this reseach project further, I would do more research into how these rates are being generated.
-    * **vcrimerate**: Violent crime rate
-    * **propcrimerate**: Property crime rate
-    * **z_cigarette_taxes**: Cigarette tax rate
-    * **cbeertex**: Beer excise tax rates (dollars per gallon, off-premises sales). This was the only alcohol-related tax I could find which was available in roughly the same years as our dependent variable.
-    * **statemin**: The state minimum wage.
-    * **unemployment**: The unemployment rate.
-    * **povrate**: The poverty rate.
-    * **cons_fossil**: I scale (subtract the mean, divide by standard deviation) **cons_fossil** (fossil fuel consumption in billion BTU) within each year to make cross-year and cross-state comparisons more meaningful. 
-    * **ranney1_sen_dem_prop**: Proportion of state senate members who are Democrats.
-    * **ranney2_hs_dem_prop**: Proportion of state house members who are Democrats.
-
-```{r, warning = F, message = F}
+## ---- warning = F, message = F---------------------------------------------------------------------------------------
 library(mlr)
 library(cspp)
 library(kknn)
@@ -38,13 +11,9 @@ library(parallel)
 library(reghelper)
 library(ggcorrplot)
 library(parallelMap)
-```
 
-## Clean the data
 
-Aside from scaling the fossil fuel consumption variable, I filter out the District of Columbia and Nebraska due to extensive missingness of data.
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 vars <- c("infantmortality", "vcrimerate", "propcrimerate", "z_cigarette_taxes",
           "cbeertex", "statemin", "unemployment", "povrate", "cons_fossil",
           "ranney1_sen_dem_prop", "ranney2_hs_dem_prop")
@@ -59,65 +28,45 @@ data <-
            state = as.factor(state)) %>%
     ungroup() %>%
     select(-cons_fossil)
-```
 
-## Data Exploration
 
-How much data are we missing? Some of our variables have a moderate amount of missingess which we will have to deal with later.
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 missings <- map(data, ~sum(is.na(.x)))
 missingsPrcnt <- unlist(missings) / nrow(data)
-```
 
-## Split data into test and train
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 set.seed(420)
 train <- data %>% sample_frac(0.70)
 test <- anti_join(data, train)
-```
 
-Let's get a sense of the linear relationship between each independent variable and the dependent variable.
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 trainUntidy <- train %>% pivot_longer(c(-infantmortality, -state))
 ggplot(trainUntidy, aes(value, infantmortality)) +
     facet_wrap(~ name, scale = "free_x") +
     geom_point() +
     geom_smooth(method = "lm") +
     theme_bw()
-```
 
-Let's see a correlation matrix between all of our variables (since they are all numeric).
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 corrMatrix <- cor(select(train, -year, -state), use = "complete.obs")
 
 ggcorrplot(corrMatrix,
            type = "lower",
            method = "circle",
            colors = c("red", "white", "blue"))
-```
 
-## Impute Missing Data for train and reimpute the data for test
 
-We are going to use a decision tree to impute missing values. Normally we wouldn't have to worry about missing values since random forest and xgboost can handle missing values. K-nearest neighbors cannot handle missing values though.
-
-We are also going to use the model learned on our train set to also impute the missing values in our test set.
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 imputeMethod <- imputeLearner("regr.rpart")
 trainImputed <- impute(as.data.frame(train),
                        classes = list(numeric = imputeMethod))
 testImputed <- reimpute(test, trainImputed$desc)
-```
 
-## Create our task and our learners
 
-You may have noticed above I don't include year or state in my independent variables. I do include them in the imputation model because they're undoubtedly useful for imputing missing values. However I don't wish to include them in the prediction models. For this exercise, I want to see how much the characteristics of states (rather than the states themselves) can predict the infant mortality rates. I also want to see if our results can generalize across time.
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 # Create the training task on the imputed data not including year or state
 infantMortalityTaskTrain <-
     makeRegrTask(data = select(trainImputed$data, -year, -state),
@@ -136,17 +85,9 @@ gridSearch <- makeTuneControlGrid()
 
 # Tree-based algos will explore 100 different combinations of hyperparameters
 randSearch <- makeTuneControlRandom(maxit = 100)
-```
 
-## Tune the hyperparameters for kNN
 
-k-nearest neighbors only has one parameter to tune (k or the number of neighbors to consider).
-
-I'll also note we will be using **RMSE** (Root Mean Squared Error) to evaluate the performance of our hyperparameters (less susceptible to the influence of outliers). I'll also be reporting **MAE** (Mean Absolute Error) for fun.
-
-**Question: When might you prefer RMSE?**
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 knnParamSpace <- makeParamSet(makeDiscreteParam("k", values = 1:50))
 
 tunedKnn <- tuneParams(knn,
@@ -157,22 +98,18 @@ tunedKnn <- tuneParams(knn,
                        measures = list(rmse, mae))
 
 tunedKnn
-```
 
-Did we find a local or global minimum for our hyperparameter?
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 knnTuningData <- generateHyperParsEffectData(tunedKnn)
 
 plotHyperParsEffect(knnTuningData, x = "k",
                     y = "rmse.test.rmse",
                     plot.type = "line") +
     theme_bw()
-```
 
-## Tune the hyperparameters for random forest
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 forestParamSpace <-
     makeParamSet(makeIntegerParam("ntree", lower = 200, upper = 200),
                  makeIntegerParam("mtry", lower = 5, upper = 10),
@@ -195,11 +132,9 @@ parallelStop()
 proc.time() - ptm
 
 tunedRandomForest
-```
 
-## Tune the hyperparameters for XGBoost
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 xgbParamSpace <-
     makeParamSet(makeNumericParam("eta", lower = 0, upper = 1),
                  makeNumericParam("gamma", lower = 0, upper = 10),
@@ -221,13 +156,9 @@ tunedXgb <- tuneParams(xgb,
 proc.time() - ptm
 
 tunedXgb
-```
 
-## Train random forest and XGBoost models (and OLS because why not)
 
-We are also going to check and see if the RMSE converges with the number of trees trained.
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 # train our OLS regression
 trainedOls <- lm(infantmortality ~ .,
                  data = select(trainImputed$data, -state, -year))
@@ -254,15 +185,9 @@ ggplot(xgbData$evaluation_log, aes(iter, train_rmse)) +
     geom_line() +
     geom_point() +
     theme_bw()
-```
 
-## See how well our models do predicting out of sample on the test set.
 
-As a reminder, we will be using MSE (mean square error) to evaluate peformance.
-
-$\sqrt{\frac{1}{n}\sum_{i=1}^n(Y_i - \hat{Y_i})^2}$
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 predictOls <-
     as_tibble(predict(trainedOls,
                       newdata = select(testImputed, -year, -state))) %>%
@@ -318,11 +243,9 @@ cat("ols: ", unique(predictOls$mae), "\n")
 cat("knn: ", unique(predictKnn$mae), "\n")
 cat("random forest: ", unique(predictRandomForest$mae), "\n")
 cat("xgb: ", unique(predictXgb$mae), "\n")
-```
 
-## Let's visualize the predictions and how well they line up with the actual values
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 ggplot(predictOls, aes(x = infantmortality, y = value)) +
     geom_point() +
     geom_abline(intercept = 0, slope = 1) +
@@ -346,19 +269,9 @@ ggplot(predictXgb, aes(x = truth, y = response)) +
     geom_abline(intercept = 0, slope = 1) +
     theme_bw() +
     labs(title = "Xgb predicted vs. truth")
-```
 
-## See which features were most important in random forest vs. xgboost
 
-* I standardized the coefficients in the OLS regression model to facilitate coefficient comparison. By standardizing the coefficients, I mean to say I divided by each variable's standard deviation. Coefficients should be interpreted as standard deviation increases rather than unit increases.
-* Random Forest for regression reports two measures of variable importance:
-    * The first measure captures how much the prediction error or accuracy suffers when the values for that variable are randomly permuted (accuracy as measured by mean squared error). **You can train a random forest to minimize MAE as well, not sure how to do this in R**.
-    * The second measure captures how well the variable splits nodes or decreases node impurities. For regressions, this captures how well the variable minimizes the sum of squared residuals (the numerator in mean squared error) when splitting.
-* Xgboost reports variable importance as the improvement in accuracy brought by that feature in the branches which use it. The idea being that adding a new split using the variable in question made your predictions more accurate than before. It's calculated by looking at each feature's contribution from each tree in the model.
-
-**If I were to expand upon this work, I would figure out ways of making the features more important to help policymakers and citizens better understand how pulling different levers or changing different aspects of their town might affect the infant mortality rate.**
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------
 randomForestFeaturesGini <-
     getFeatureImportance(trainedRandomForest)$res %>%
     mutate(model = "randomForestNode")
@@ -392,4 +305,4 @@ ggplot(features, aes(x = reorder(variable, importance), y = importance)) +
     facet_wrap(~ model, scales = "free_x") +
     coord_flip() +
     theme_bw()
-```
+
