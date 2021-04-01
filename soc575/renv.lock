@@ -9,6 +9,13 @@
     ]
   },
   "Packages": {
+    "AER": {
+      "Package": "AER",
+      "Version": "1.2-9",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "dccc3a89c739957286953821f9bcd971"
+    },
     "AICcmodavg": {
       "Package": "AICcmodavg",
       "Version": "2.3-1",
@@ -1107,6 +1114,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "066f49a225dc3215cb1f32bc23535f88"
+    },
+    "truncreg": {
+      "Package": "truncreg",
+      "Version": "0.2-5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a6136f040369c004ed21c796cd7777c5"
     },
     "ucminf": {
       "Package": "ucminf",

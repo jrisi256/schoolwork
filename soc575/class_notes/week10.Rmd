@@ -1,0 +1,60 @@
+---
+title: "Week 10"
+output: html_document
+---
+
+* https://stats.idre.ucla.edu/r/dae/tobit-models/
+* https://stats.idre.ucla.edu/r/dae/truncated-regression/
+* http://search.r-project.org/library/AER/html/tobit.html
+* https://www.rdocumentation.org/packages/AER/versions/1.2-9/topics/tobit
+* https://rpubs.com/Zahidasghar/Tobit_Model
+* http://finzi.psych.upenn.edu/R/library/VGAM/html/tobit.html
+
+```{r}
+library(AER)
+library(here)
+library(VGAM)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(haven)
+library(forcats)
+library(truncreg)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+```
+
+```{r}
+dataClean <-
+    data %>%
+    select(f22xrirr, bys43, bys80) %>%
+    mutate(readtest0 = as.numeric(if_else(is.na(f22xrirr),
+                                          0,
+                                          as.numeric(f22xrirr))),
+           smoker = as.factor(as.character(fct_recode(sjlabelled::as_factor(bys43),
+                                                      "nonsmoker" = "0",
+                                                      "smoker" = "1",
+                                                      "smoker" = "2",
+                                                      "smoker" = "3",
+                                                      "smoker" = "4"))),
+           neverread = as.factor(as.character(fct_recode(sjlabelled::as_factor(bys80),
+                                                        "neverread" = "0",
+                                                        "read" = "1",
+                                                        "read" = "2",
+                                                        "read" = "3",
+                                                        "read" = "4",
+                                                        "read" = "5")))) %>%
+    mutate(readtest = as.numeric(f22xrirr),
+           neverread = relevel(neverread, "read")) %>%
+    select(readtest0, smoker, neverread) %>%
+    filter(across(everything(), ~!is.na(.)))
+```
+
+```{r}
+tobitModel <- VGAM::vglm(readtest0 ~ ., tobit(Lower = 0), data = dataClean)
+summary(tobitModel)
+exp(3.039093)
+```
