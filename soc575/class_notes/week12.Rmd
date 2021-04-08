@@ -4,6 +4,10 @@ output: html_document
 ---
 
 https://stats.idre.ucla.edu/r/dae/poisson-regression/
+https://stats.stackexchange.com/questions/66586/is-there-a-test-to-determine-whether-glm-overdispersion-is-significant
+https://stats.idre.ucla.edu/r/dae/negative-binomial-regression/
+https://www.jamesuanhoro.com/post/2018/05/07/simulating-data-from-regression-models/
+https://clanfear.github.io/Stata_R_Equivalency/docs/count_models.html
 
 ```{r}
 library(AER)
