@@ -1,0 +1,94 @@
+---
+title: "week12"
+output: html_document
+---
+
+https://stats.idre.ucla.edu/r/dae/poisson-regression/
+
+```{r}
+library(AER)
+library(here)
+library(pscl)
+library(MASS)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(haven)
+library(forcats)
+library(ggplot2)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+```
+
+```{r}
+dataClean <-
+    data %>%
+    mutate(male = as.numeric(as.character(fct_recode(sjlabelled::as_factor(sex),
+                                                    "0" = "2"))),
+           f4hhdg = if_else(is.na(f4hhdg), 0, as.numeric(f4hhdg)),
+           f4idrink = as.numeric(f4idrink),
+           f4aempl = as.numeric(f4aempl)) %>%
+    select(male, f4hhdg, f4aempl, f4idrink) %>%
+    filter(across(everything(), ~!is.na(.x)))
+```
+
+Don't forget to exponentiate.
+
+```{r}
+poissonModel <- glm(f4idrink ~ ., family="poisson", data = dataClean)
+summary(poissonModel)
+```
+
+Assessing model fit
+
+```{r}
+simulate <-
+    simulate(poissonModel, 100) %>%
+    pivot_longer(everything()) %>%
+    count(value) %>%
+    mutate(prcnt = n / sum(n),
+           type = "sim") %>%
+    rename(f4idrink = value)
+
+real <-
+    dataClean %>%
+    count(f4idrink) %>%
+    mutate(prcnt = n / sum(n),
+           type = "real")
+
+compare <- bind_rows(simulate, real)
+
+compare %>%
+    ggplot(aes(x = f4idrink, y = prcnt)) +
+    geom_line(aes(color = type, group = type)) +
+    geom_point(aes(color = type)) +
+    theme_bw()
+```
+
+```{r}
+negBin <- MASS::glm.nb(f4idrink ~ ., data = dataClean)
+summary(negBin)
+AER::dispersiontest(poissonModel)
+pscl::odTest(negBin)
+
+simulateNegBin <-
+    simulate(negBin, 1) %>%
+    pivot_longer(everything()) %>%
+    count(value) %>%
+    mutate(prcnt = n / sum(n),
+           type = "simNegBin") %>%
+    rename(f4idrink = value) %>%
+    filter(f4idrink <= 30)
+
+compareRealNegBin <- bind_rows(simulateNegBin, real)
+
+compareRealNegBin %>%
+    ggplot(aes(x = f4idrink, y = prcnt)) +
+    geom_line(aes(color = type, group = type)) +
+    geom_point(aes(color = type)) +
+    theme_bw()
+```
+
