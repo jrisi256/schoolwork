@@ -8,6 +8,12 @@ https://stats.stackexchange.com/questions/66586/is-there-a-test-to-determine-whe
 https://stats.idre.ucla.edu/r/dae/negative-binomial-regression/
 https://www.jamesuanhoro.com/post/2018/05/07/simulating-data-from-regression-models/
 https://clanfear.github.io/Stata_R_Equivalency/docs/count_models.html
+https://francish.netlify.app/post/poisson-and-negative-binomial-regression-using-r/
+
+## Zero counts
+https://fukamilab.github.io/BIO202/04-C-zero-data.html
+https://stats.idre.ucla.edu/r/dae/zinb/
+https://stats.idre.ucla.edu/r/dae/zip/
 
 ```{r}
 library(AER)
@@ -96,3 +102,42 @@ compareRealNegBin %>%
     theme_bw()
 ```
 
+Can also do predictions.
+
+```{r}
+predictGender <- tibble(male = 0,
+                        f4hhdg = mean(dataClean$f4hhdg),
+                        f4aempl = mean(dataClean$f4aempl))
+
+predictionsGender <- predict(negBin, newdata = predictGender, type = "response")
+
+predictEmpl <- tibble(male = mean(dataClean$male),
+                      f4hhdg = mean(dataClean$f4hhdg),
+                      f4aempl = c(0, 1))
+
+predictionsEmpl <- predict(negBin, newdata = predictEmpl, type = "response")
+predictedProb <- pscl::predprob(negBin) %>% colMeans()
+
+
+predictFemale <- tibble(male = 0,
+                        f4hhdg = mean(dataClean$f4hhdg),
+                        f4aempl = mean(dataClean$f4aempl))
+
+predictMale <- tibble(male = 1,
+                      f4hhdg = mean(dataClean$f4hhdg),
+                      f4aempl = mean(dataClean$f4aempl))
+
+predictedProbMale <- predprob(negBin, newdata = predictMale) %>% colMeans()
+predictedProbFemale <- predprob(negBin, newdata = predictFemale) %>% colMeans()
+```
+
+## Zero Counts
+
+```{r}
+zinb <- pscl::zeroinfl(f4idrink ~ . | ., data = dataClean, dist = "negbin")
+zip <- pscl::zeroinfl(f4idrink ~ . | ., data = dataClean)
+summary(zinb)
+BIC(zinb)
+BIC(negBin)
+BIC(zip)
+```
