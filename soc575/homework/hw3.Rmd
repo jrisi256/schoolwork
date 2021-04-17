@@ -1,0 +1,187 @@
+---
+title: "Homework 3"
+output: pdf_document
+---
+
+```{r}
+library(here)
+library(MASS)
+library(VGAM)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(forcats)
+library(ggplot2)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("class data.dta"))
+```
+
+## Question 1
+
+```{r}
+dataClean <-
+    data %>%
+    select(f4hhdg, f4hi99) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(f4hi99 = as.numeric(f4hi99),
+           f4hhdg = relevel(as.factor(as_character(f4hhdg)),
+                            ref = "some pse, no degree attained")) %>%
+    rename(inc = f4hi99, educ = f4hhdg)
+
+olsModel <- lm(inc ~ ., data = dataClean)
+summary(olsModel)
+```
+
+```{r}
+dataBinary <-
+    data %>%
+    select(f4hhdg, f4hi99) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(f4hi99 = as.numeric(f4hi99),
+           f4hhdg = as.factor(as.character(fct_recode(
+               sjlabelled::as_character(f4hhdg),
+               "0" = "some pse, no degree attained",
+               "0" = "certificate/license",
+               "0" = "associate^s degree",
+               "1" = "bachelor^s degree",
+               "1" = "master^s degree/equivalent",
+               "1" = "ph.d or a professional degree")))) %>%
+    rename(inc = f4hi99, educ = f4hhdg)
+
+olsModelBin <- lm(inc ~ ., data = dataBinary)
+summary(olsModelBin)
+```
+
+```{r}
+dataBinaryNoZero <-
+    dataBinary <-
+    data %>%
+    select(f4hhdg, f4hi99) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    filter(f4hi99 != 0) %>%
+    mutate(f4hi99 = as.numeric(f4hi99),
+           f4hhdg = as.factor(as.character(fct_recode(
+               sjlabelled::as_character(f4hhdg),
+               "0" = "some pse, no degree attained",
+               "0" = "certificate/license",
+               "0" = "associate^s degree",
+               "1" = "bachelor^s degree",
+               "1" = "master^s degree/equivalent",
+               "1" = "ph.d or a professional degree")))) %>%
+    rename(inc = f4hi99, educ = f4hhdg)
+
+olsModelBinNoz <- lm(inc ~ ., data = dataBinaryNoZero)
+summary(olsModelBinNoz)
+```
+
+```{r}
+tobitModel <- VGAM::vglm(inc ~ ., tobit(Lower = 0), data = dataBinary)
+summary(tobitModel)
+```
+
+## Question 2
+
+Reference group is male. Male is 1 and female is 0. Male is reference group. Recode to male.
+
+```{r}
+dataClean2 <-
+    data %>%
+    select(f4gnch, sex, f4ibinge) %>%
+    mutate(f4ibinge = as.numeric(f4ibinge),
+           f4gnch = as.numeric(f4gnch),
+           sex = as.numeric(as.character(fct_recode(
+               sjlabelled::as_character(sex),
+               "1" = "male",
+               "0" = "female")))) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    rename(male = sex)
+```
+
+```{r}
+poissonModel <- glm(f4ibinge ~ ., family="poisson", data = dataClean2)
+summary(poissonModel)
+broom::tidy(poissonModel, conf.int = T, exponentiate = T, p.value = T) %>%
+    filter(term != "(Intercept)")
+```
+
+```{r}
+negBin <- MASS::glm.nb(f4ibinge ~ ., data = dataClean2)
+summary(negBin)
+broom::tidy(negBin, conf.int = T, exponentiate = T, p.value = T) %>%
+    filter(term != "(Intercept)")
+```
+
+```{r}
+AER::dispersiontest(poissonModel)
+pscl::odTest(negBin)
+BIC(poissonModel)
+BIC(negBin)
+AIC(poissonModel)
+AIC(negBin)
+```
+
+```{r}
+predictFemale <- tibble(male = 0,
+                        f4gnch = c(0, 1, 2, 3, 4, 5, 6, 7, 8))
+
+predictMale <- tibble(male = 1,
+                      f4gnch = c(0, 1, 2, 3, 4, 5, 6, 7, 8))
+
+predictedProbMale <-
+    pscl::predprob(negBin, newdata = predictMale) %>%
+    as_tibble() %>%
+    dplyr::select(`0`) %>%
+    mutate(gender = "male",
+           nrChildren = row_number()) %>%
+    rename(Probability = `0`)
+
+predictedProbFemale <-
+    pscl::predprob(negBin, newdata = predictFemale) %>%
+    as_tibble() %>%
+    dplyr::select(`0`) %>%
+    mutate(gender = "female",
+           nrChildren = row_number()) %>%
+    rename(Probability = `0`)
+
+predictedProbGender <- bind_rows(predictedProbMale, predictedProbFemale)
+```
+
+```{r}
+predictedProbGender %>%
+    ggplot(aes(x = nrChildren, y = Probability)) +
+    geom_line(aes(color = gender, group = gender)) +
+    geom_point(aes(color = gender)) +
+    theme_bw() +
+    labs(x = "Number of Children", y = "Probability of Zero binge drinking events",
+         color = "Sex")
+```
+
+Assessing Model Fit
+
+```{r}
+poissonSimulate <-
+    simulate(poissonModel, 100) %>%
+    pivot_longer(everything()) %>%
+    count(value) %>%
+    mutate(prcnt = n / sum(n),
+           type = "simPoisson") %>%
+    rename(f4ibinge = value) %>%
+    filter(f4ibinge <= 10)
+
+real <-
+    dataClean2 %>%
+    count(f4ibinge) %>%
+    mutate(prcnt = n / sum(n),
+           type = "real")
+
+compare <- bind_rows(real, poissonSimulate, negbinSimulate)
+
+compare %>%
+    ggplot(aes(x = f4ibinge, y = prcnt)) +
+    geom_line(aes(color = type, group = type)) +
+    geom_point(aes(color = type)) +
+    theme_bw()
+```

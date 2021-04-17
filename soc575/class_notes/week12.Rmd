@@ -9,6 +9,7 @@ https://stats.idre.ucla.edu/r/dae/negative-binomial-regression/
 https://www.jamesuanhoro.com/post/2018/05/07/simulating-data-from-regression-models/
 https://clanfear.github.io/Stata_R_Equivalency/docs/count_models.html
 https://francish.netlify.app/post/poisson-and-negative-binomial-regression-using-r/
+https://stats.stackexchange.com/questions/221648/negative-binomial-regression-in-r-allowing-for-correlation-between-dispersion
 
 ## Zero counts
 https://fukamilab.github.io/BIO202/04-C-zero-data.html
