@@ -37,3 +37,6 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# Pre-trained word embeddings -> very big, don't want.
+class_presentations/2021-04-19-word-embeddings/glove_6B_100d_copy.csv
