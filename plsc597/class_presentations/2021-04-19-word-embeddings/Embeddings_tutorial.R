@@ -23,7 +23,11 @@ sample_twts <- subset(sample_twts,isRetweet==F)
 
 # Pretrained GLoVE embedding from Stanford NLP
 # Trained on Wikipedia, 100d
-glove6b <- read.csv("glove_6B_100d_copy.csv",stringsAsFactors=F,header=F)
+glove6b <- read.csv(here("class_presentations",
+                         "2021-04-19-word-embeddings",
+                         "glove_6B_100d_copy.csv"),
+                    stringsAsFactors = F,
+                    header = F)
   #can take a couple of minutes
 
 glove6b[1:10,1:10]
