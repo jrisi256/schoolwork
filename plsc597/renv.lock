@@ -100,6 +100,13 @@
       "Repository": "CRAN",
       "Hash": "6d0e5aada1900c1bc778c00573aefd53"
     },
+    "ISOcodes": {
+      "Package": "ISOcodes",
+      "Version": "2021.02.24",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "f3a4d9933f1ca39b112f5dbe5cb56f05"
+    },
     "KernSmooth": {
       "Package": "KernSmooth",
       "Version": "2.23-18",
@@ -212,6 +219,13 @@
       "Repository": "CRAN",
       "Hash": "ddfa72a87fdf4c80466a20818be91d00"
     },
+    "RcppParallel": {
+      "Package": "RcppParallel",
+      "Version": "5.1.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "028b767d58b4a2f2240dec3f97217414"
+    },
     "RcppProgress": {
       "Package": "RcppProgress",
       "Version": "0.4.2",
@@ -225,6 +239,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "0cf10dab0d023d5b46a5a14387556891"
+    },
+    "SnowballC": {
+      "Package": "SnowballC",
+      "Version": "0.7.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "bc26e07c0d747fd287c370fe355e7b85"
     },
     "SparseM": {
       "Package": "SparseM",
@@ -1388,6 +1409,13 @@
       "Repository": "CRAN",
       "Hash": "5f919ae5e7f83a6f91dcf2288943370d"
     },
+    "quanteda": {
+      "Package": "quanteda",
+      "Version": "3.0.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a7f5d68d27e1c846a066d28305535d8e"
+    },
     "quantreg": {
       "Package": "quantreg",
       "Version": "5.85",
@@ -1632,6 +1660,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "53c27113461e8abbe2dc7125e22b2a39"
+    },
+    "stopwords": {
+      "Package": "stopwords",
+      "Version": "2.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "d37b9497a593d94425d90379e6478aee"
     },
     "stringi": {
       "Package": "stringi",
