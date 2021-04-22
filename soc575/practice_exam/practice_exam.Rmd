@@ -1,0 +1,76 @@
+---
+title: "Practice Exam"
+output: html_document
+---
+
+```{r}
+library(here)
+library(dplyr)
+library(haven)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("practice_exam", "practice exam data.dta"))
+```
+
+## OLS Regression
+
+1. Pretty easy to just interpret the coefficients.
+2. You multiply the max value by each of its coefficients while holding reading scores constant (at its mean).
+3. Prediction is easy.
+4. Just set everything to the mean.
+5. Fully standardized values: beta * (std. dev. of beta / std. deviation of outcome)
+
+## Logistic Regression
+
+1. Males are less likely to drop out holding all else constant. Remember 0 = not dropping out, 1 = dropping out.
+2. `r exp(27.44246 * -0.0420738 + 1 * -0.4226643 + 2.98648 * -0.8432001 + -0.2803264 + 2.623747) / (1 + exp(-1.752053))`
+3. Do it using R.
+4. `r exp(27.44246 * -0.0420738 + 6 * -0.4226643 + 2.98648 * -0.8432001 + 2.623747) / (1 + exp(-3.585048))``
+5. Interpretation is pretty easy.
+
+## Multinomial Logistic Regression
+
+1. Interpret it. `r 1 - exp(-0.7365621)` -> Unit increase in GPA leads to 52% decrease in the odds of being married.
+2. Reject the hypothesis that the coefficients are actually 0. It's an omnibus test. Do my variables affect any of the outcomes? Because we're making so many comparisons, it's possible we find some relationship even when the overall effect is 0. I think.
+3. Check if categories can be combined. Use the combTest command.
+
+
+## Ordinal Logistic Regression
+
+1. This interpretation is hard. `r 1 - exp(-0.2590192)`.
+    * SA vs. A, D, SD
+    * SD and D vs. A and SA
+    * SA, A, D vs. SD
+2. No evidence that moving from one category to another has different coefficient values for the independent variables. The Proportional Odds Assumption isn't violated.
+
+3. 
+
+```{r}
+dataClean <-
+    data %>%
+    select(worthless12, bygrads, by2xrirr, male) %>%
+    filter(across(everything() , ~!is.na(.x))) %>%
+    mutate(worthless12 = as.factor(worthless12),
+           bygrads = as.numeric(bygrads),
+           by2xrirr = as.numeric(by2xrirr),
+           male = as.factor(male))
+
+ologit <- MASS::polr(worthless12 ~ ., data = dataClean)
+summary(ologit)
+
+predictions <- effects::Effect(focal.predictors = c("male"), ologit)
+
+byFemale <- tibble(male = factor(0),
+                   bygrads = mean(dataClean$bygrads),
+                   by2xrirr = mean(dataClean$by2xrirr))
+
+predictFemale <- predict(ologit, newdata = byFemale, type = "probs")
+```
+
+## Negative binomial regression
+
+1. Use negative binomial, evidence of overdispersion.
+2. Interpretation.
+3. 
