@@ -1,0 +1,36 @@
+---
+title: "HW3 - Joe Risi - PLSC 597: Machine Learning"
+output: pdf_document
+---
+
+## Introduction and Replication - Question 1
+
+Harvard Dataverse Link - https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/IOUQ5X  
+Cambridge Core Stable Link - https://www-cambridge-org.ezaccess.libraries.psu.edu/core/journals/japanese-journal-of-political-science/article/explaining-variations-in-responsiveness-to-external-pressure-japans-aid-policy-and-bureaucratic-politics/EF0A1EAF5E54EB18A332C444CBE3A592  
+Github Link to Code For Assignment - 
+
+```{r}
+library(dplyr)
+library(readr)
+```
+
+```{r}
+load("~/Downloads/aid_data.RData")
+dataClean <-
+    table %>%
+    select(lyenloans2, lusaid2l, lgdppcl, lpopl, ltradel, democracy2, jipdistance,
+           warl, ltotaldeath2l, ltargetjapanl, cmember, year, ccode) %>%
+    mutate(year = as.factor(year),
+           ccode = as.factor(ccode))
+
+model <- lm(lyenloans2 ~ ., data = dataClean)
+summary(model)
+```
+
+regress lyenloans2 lusaid2l lgdppcl lpopl ltradel democracy2 jipdistance warl ltotaldeath2l ltargetjapanl cmember i.year i.ccode, vce(cluster ccode)
+
+Split the data into 70% training and 30% test sets. Use the training set alone for this part of the exercise. Evaluating performance via cross-validation, identify a generalized additive model, and a random forest, using the same independent variables, or a subset thereof, used in the model replicated for Question 1.
+
+Compare the predictive performance original regression model and the other machine learning methods using the test data. Be sure not to estimate any model using the test data. Comment on which model fits better on the test data.
+
+Now using the full data, calculate variable importance using each method (linear regression, GAM, RF), and comment on whether the importance of variables differs across the three models. Plot the effects of the GAM, and comment on whether you find any notable nonlinear relationships that were not reflected in the linear model.

@@ -13,8 +13,7 @@ Link to github repository - https://github.com/jrisi256/schoolwork/tree/main/pls
 
 * The purpose of the study is to assess the association between Anglo aversion to Latinos and a variety of other factors including: physical proximity to Latinos, contact with ethnic minorities, and expressed preferences for immigration policies.
 * The underlying hypothesis argues immigration policy preferences are strongly influenced by racial resentment rather than other considerations like economic anxiety.
-* Other hypotheses argue Anglos living in neighborhoods with larger pro
-portions of Latinos will harbor more restrictive attitudes on immigration, but Anglos who interact more frequently with minorities will harbor less restrictive attitudes on immigration.
+* Other hypotheses argue Anglos living in neighborhoods with larger proportions of Latinos will harbor more restrictive attitudes on immigration, but Anglos who interact more frequently with minorities will harbor less restrictive attitudes on immigration.
 
 ### Data and Methods
 
@@ -43,7 +42,7 @@ portions of Latinos will harbor more restrictive attitudes on immigration, but A
     * Age = age
     * Sex = male
 * **Results**
-    * Age, gender, and personal financial situation are not statistically significant. In contrast to the their hypothesis, Latino aversion was not statistically significant either.
+    * Age, gender, and personal financial situation are not statistically significant. In contrast to their hypothesis, Latino aversion was not statistically significant either.
     * Increased minority contact was positively associated with amnesty however it was only marginally significant.
     * Decreased income was negatively associated with amnesty however it was only marginally significant.
     * Latino context was negatively and statistically significantly associated with amnesty meaning the more Latinos living in your Census tract the more likely you were to view amnesty as a bad thing.
