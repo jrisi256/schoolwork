@@ -243,7 +243,7 @@ gameFeatSelWrapper <- makeFeatSelWrapper(learner = gamImputeWrapper,
                                          control = featSelControl)
 ```
 
-Let's cross-validate our model. The gamboost algorithm is quite computationally intense so for this excersei we're going to just use a holdout cross-validation strategy.
+Let's cross-validate our model. The gamboost algorithm is quite computationally intense so for this exercise we're going to just use a holdout cross-validation strategy.
 
 ```{r}
 holdout <- makeResampleDesc("Holdout")
