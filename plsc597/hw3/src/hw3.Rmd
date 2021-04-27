@@ -161,6 +161,82 @@ tunedRfs[["total"]]
 gamCVs[["total"]]
 ```
 
+If you try to fit a spline with only two values, there is perfect correlation within the spline components between x, x^2, x^3. You cannot fit a spline this way.
+
+Only do the complex splines on the numerical variables.
+
+Sees a factor variable, can't fit polynomials to this, fit a linear variable to this.
+
+```{r}
+dataCleanExample <- dataClean %>% select(democracy2, lyenloans2)
+summary(dataCleanExample$democracy2)
+table(dataCleanExample$democracy2)
+class(dataCleanExample$democracy2)
+
+trainE <- dataCleanExample[split,]
+
+exampleTask <- makeRegrTask(data = trainE, target = "lyenloans2")
+resample(gam, exampleTask, resampling = kFold3, measures = list(rmse))
+```
+
+```{r}
+dataCleanExample2 <- dataClean %>% select(lusaid2l, lyenloans2)
+summary(dataCleanExample2$lusaid2l)
+
+trainE2 <- dataCleanExample2[split,]
+
+exampleTask2 <- makeRegrTask(data = trainE2, target = "lyenloans2")
+resample(gam, exampleTask2, resampling = kFold3, measures = list(rmse))
+```
+
+```{r}
+trainENum <- trainE %>% mutate(democracy2 = as.numeric(democracy2))
+class(trainENum$democracy2)
+
+exampleTaskNum <- makeRegrTask(data = trainENum, target = "lyenloans2")
+resample(gam, exampleTaskNum, resampling = kFold3, measures = list(rmse))
+```
+
+```{r}
+trainEFac <- trainE %>% mutate(democracy2 = as.factor(democracy2))
+class(trainEFac$democracy2)
+
+exampleTaskFac <- makeRegrTask(data = trainEFac, target = "lyenloans2")
+resample(gam, exampleTaskFac, resampling = kFold3, measures = list(rmse))
+```
+
+```{r}
+dataCleanExample3 <-
+    dataClean %>%
+    select(lusaid2l, ccode, democracy2, lyenloans2)
+
+trainE3 <-
+    dataCleanExample3[split,] %>%
+    mutate(ccode = as.factor(ccode),
+           democracy2 = as.factor(democracy2))
+
+class(trainE3$democracy2)
+class(trainE3$ccode)
+class(train$lusaid2l)
+
+exampleTask3 <- makeRegrTask(data = trainE3, target = "lyenloans2")
+resample(gam, exampleTask3, resampling = kFold3, measures = list(rmse))
+```
+
+```{r}
+dataCleanExample4 <-
+    dataClean %>%
+    select(ltargetjapanl, lyenloans2)
+
+trainE4 <- dataCleanExample4[split,]
+
+class(trainE4$ltargetjapanl)
+
+exampleTask4 <- makeRegrTask(data = trainE4, target = "lyenloans2")
+
+resample(gam, exampleTask4, resampling = kFold3, measures = list(rmse))
+```
+
 Using cross-validation, it appears as if random forest performs better than GAM. However we will hold off on making any final claims until we evaluate the models on the held-out test set.
 
 ## Question 3
