@@ -1,0 +1,72 @@
+---
+title: "Final Exam"
+output: html_document
+---
+
+```{r}
+library(here)
+library(dplyr)
+library(haven)
+library(sjlabelled)
+```
+
+```{r}
+data <- haven::read_dta(here("final_exam", "exam data.dta"))
+```
+
+## Question 2
+
+```{r}
+dataLogit <-
+    data %>%
+    select(arrested12, male, gpa8, smoker8) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(gpa8 = as.numeric(gpa8),
+           smoker8 = as.numeric(as_character(smoker8)),
+           arrested12 = as.factor(as_character(arrested12)),
+           male = as.factor(as_character(male)))
+
+logitModel <- glm(arrested12 ~ ., data = dataLogit, family = "binomial")
+summary(logitModel)
+exp(coef(logitModel))
+paste0(100 * (exp(coef(logitModel)) - 1), "%")
+```
+
+```{r}
+predictDf1 <- tibble(male = as.factor(1), smoker8 = 1, gpa8 = 2)
+prediction1 <- predict(logitModel, newdata = predictDf1, type = "response")
+
+predictDf2 <-
+    tibble(male = as.factor(0), gpa8 = 3.5, smoker8 = mean(dataLogit$smoker8))
+prediction2 <- predict(logitModel, newdata = predictDf2, type = "response")
+```
+
+## Question 3
+
+```{r}
+dataOlogit <-
+    data %>%
+    select(hieffort, educexpect, pareduc, feelgood) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(hieffort = as.numeric(hieffort),
+           educexpect = as.numeric(educexpect),
+           pareduc = as.numeric(pareduc),
+           feelgood = as.factor(as_character(feelgood)))
+
+ologitModel <- MASS::polr(feelgood ~ ., data = dataOlogit)
+summary(ologitModel)
+exp(coef(ologitModel))
+paste0(100 * (exp(coef(ologitModel)) - 1), "%")
+```
+
+```{r}
+car::poTest(ologitModel)
+```
+
+```{r}
+predictDf3 <- tibble(hieffort = mean(dataOlogit$hieffort),
+                     educexpect = 1,
+                     pareduc = mean(dataOlogit$pareduc))
+
+prediction3 <- predict(ologitModel, newdata = predictDf3, type = "probs")
+```

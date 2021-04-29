@@ -20,7 +20,7 @@ data <- haven::read_dta(here("practice_exam", "practice exam data.dta"))
 2. You multiply the max value by each of its coefficients while holding reading scores constant (at its mean).
 3. Prediction is easy.
 4. Just set everything to the mean.
-5. Fully standardized values: beta * (std. dev. of beta / std. deviation of outcome)
+5. Fully standardized values: beta * (std. dev. of x / std. deviation of outcome)
 
 ## Logistic Regression
 
