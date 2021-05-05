@@ -4,17 +4,37 @@ title: "Data Exploration"
 output: html_document
 ---
 
+## Packages
+
 ```{r, message = F, warning = F}
 library(here)
+library(dplyr)
 library(readr)
+library(broom)
+library(purrr)
+library(table1)
 ```
+
+## Read in data
 
 ```{r}
 data <-
     read_fwf(here("USSC_PV_Report_2020", "USSC_PV_Report_2020.dat"),
-             fwf_widths(c(6, 1, 2, 1, 1, 2, 2, 4, 2, 1, 1, 1, 2, 3, 2, 2, 1, 1,
-                          1, 1, 1, 1, 1, 4, 1, 2, 1, 10, 6, 1, 6, 1, 1, 18, 18, 1,
-                          1, 5, 4, 3, 3, 6, 1, 1),
+             fwf_widths(c(7, 1, 2,
+                          1, 1, 2,
+                          2, 4, 2,
+                          1, 1, 1,
+                          2, 3, 2,
+                          2, 1, 1,
+                          1, 1, 1,
+                          1, 1, 4,
+                          1, 2, 1,
+                          10, 6, 1, 
+                          6, 1, 1,
+                          18, 18, 1,
+                          1, 5, 4,
+                          3, 3, 6,
+                          1, 1),
                         c("USSCIDN", "ACCAP", "AGE", "AGGROLHI", "CAROFFAP",
                           "CIRCDIST", "COMBDRG2", "FISCALYR", "MITROLHI", "MONSEX",
                           "NEWCIT", "NEWRACE", "OFFTYPE2", "PROBATN", "PV_AGE",
@@ -26,5 +46,215 @@ data <-
                           "SENSPLT0", "SENTIMP", "SOURCES", "STATMAX", "STATMIN",
                           "SUPREL", "SUPRVISN", "SUPSERVED", "WEAPON", "XCRHISSR")),
              col_types = cols(PV_GRADVIOL_TABLE = "c", PV_REVTABLE_CELL = "c",
-                              PV_REVTABLE = "c"))
+                              PV_REVTABLE = "c", PV_GRADVIOL = "c"))
 ```
+
+## Some data cleaning
+
+* Filter so we only have probation violations.
+* Independent Variables:
+    * Age: PV_AGE (could also use AGE which is age at original sentencing)
+    * Sex: MONSEX
+    * Citizenship status: NEWCIT
+    * Race: NEWRACE
+    * Primary offense type at the time of original sentencing: OFFTYPE2
+    * Did offender admit to supervision violation?: PV_DISP
+    * Grade of probation violation: PV_GRADVIOL
+    * Criminal history category: XCRHISSR
+* Dependent Variables:
+    * Was revocation sentence above, below or within guidelines range?: PV_REVTABLE
+    * Total prison sentence imposed at the revocation hearing: PV_SENTTOT (includes only prison sentences and prison sentences/alternative confinement unlike PV_SENSPLT0 which includes just alternative confinement)
+    * Type of sentence imposed at revocation hearing: PV_SENTIMP
+
+```{r}
+probations <-
+    data %>%
+    filter(PV_VIOLTYP == 1) %>%
+    select(PV_AGE, MONSEX, NEWCIT, NEWRACE, OFFTYPE2, PV_DISP, PV_GRADVIOL,
+           PV_REVTABLE, PV_SENTTOT, PV_SENTIMP, XCRHISSR) %>%
+    mutate(PV_AGE = as.numeric(PV_AGE),
+           XCRHISSR = as.numeric(XCRHISSR),
+           PV_SENTTOT = as.numeric(PV_SENTTOT),
+           MONSEX = case_when(MONSEX == 0 ~ "Male",
+                              MONSEX == 1 ~ "Female"),
+           NEWCIT = case_when(NEWCIT == 0 ~ "U.S.A. Citizen",
+                              NEWCIT == 1 ~ "Non-U.S.A. Citizen"),
+           NEWRACE = case_when(NEWRACE == 1 ~ "White",
+                               NEWRACE == 2 ~ "Black",
+                               NEWRACE == 3 ~ "Hispanic",
+                               NEWRACE == 6 ~ "Other"),
+           PV_DISP = case_when(PV_DISP == 1 ~ "Admitted",
+                               PV_DISP == 2 ~ "Denied",
+                               PV_DISP == 3 ~ "Unclear",
+                               PV_DISP == 4 ~ "Admitted and Denied"),
+           PV_GRADVIOL = case_when(PV_GRADVIOL == 1 ~ "Grade A",
+                                   PV_GRADVIOL == 2 ~ "Grade B",
+                                   PV_GRADVIOL == 3 ~ "Grade C"),
+           PV_REVTABLE = case_when(PV_REVTABLE == 0 ~ "Below Range",
+                                   PV_REVTABLE == 1 ~ "Within Range",
+                                   PV_REVTABLE == 2 ~ "Above Range"),
+           NEWRACE = relevel(as.factor(NEWRACE), ref = "White"),
+           blackIntTerm = case_when(NEWRACE == "Black" & MONSEX == "Male" ~ PV_AGE,
+                                T ~ 0))
+```
+
+### Clean-up offense type category
+
+There are a lot of offense type categories. The buckets are going to be a bit small in some cases so we need to combine them.
+
+```{r}
+offtype <-
+    probations %>%
+    count(OFFTYPE2) %>%
+    mutate(prcnt = n / sum(n)) %>%
+    arrange(desc(prcnt)) %>%
+    mutate(cumsum = cumsum(prcnt))
+
+probations <-
+    probations %>%
+    mutate(OFFTYPE2 = case_when(OFFTYPE2 == 27 ~ "Immigration",
+                                OFFTYPE2 == 10 ~ "Drugs - Trafficking, Manufacturing, and Importing",
+                                OFFTYPE2 == 18 ~ "Fraud",
+                                OFFTYPE2 == 35 ~ "Traffic Violations and Other Offenses",
+                                OFFTYPE2 == 17 ~ "Larceny",
+                                OFFTYPE2 == 13 ~ "Firearms",
+                                OFFTYPE2 == 12 ~ "Drugs - Simple Possession",
+                                OFFTYPE2 == 20 ~ "Forgery/Counterfeiting",
+                                OFFTYPE2 == 30 ~ "Administration of Justice",
+                                OFFTYPE2 == 5 ~ "Assault",
+                                T ~ "All Other Offenses"),
+           OFFTYPE2 = relevel(as.factor(OFFTYPE2), ref = "Immigration"))
+```
+
+### Clean-up sentence type at revocation hearing
+
+Combine prison only (1) and prison + alternative confinement (2) into one category (1). All other revocation decisions which do not include a prison sentence are combined (0).
+
+```{r}
+probations <-
+    probations %>%
+    mutate(PV_SENTIMP =
+               case_when(PV_SENTIMP == 1 ~ 1,
+                         PV_SENTIMP == 2 ~ 1,
+                         T ~ 0))
+```
+
+### Create descriptive table for probations
+
+```{r}
+table1::label(probations$PV_AGE) <- "Age"
+table1::label(probations$MONSEX) <- "Sex"
+table1::label(probations$NEWCIT) <- "Citizenship Status"
+table1::label(probations$NEWRACE) <- "Race"
+table1::label(probations$OFFTYPE2) <- "Offense Type"
+table1::label(probations$PV_DISP) <- "Probationer Admittance"
+table1::label(probations$PV_GRADVIOL) <- "Probation Violation"
+table1::label(probations$PV_SENTIMP) <- "Revocation Decision"
+table1::label(probations$XCRHISSR) <- "Federal Criminal History Score"
+
+descrptTable <-
+    table1(~PV_AGE + MONSEX + NEWCIT + NEWRACE + OFFTYPE2 + PV_DISP + PV_GRADVIOL +
+               as.factor(PV_SENTIMP) + as.factor(XCRHISSR),
+       data = probations)
+```
+
+## Run Analyses
+
+Logistic regression as to whether or not an offender received a prison sentence or not.
+
+```{r}
+prisonOrNot <-
+    probations %>%
+    select(-PV_SENTTOT, -PV_REVTABLE) %>%
+    filter(across(everything(), ~!is.na(.x)))
+
+prisonOrNotC <-
+    probations %>%
+    filter(PV_GRADVIOL == "Grade C") %>%
+    select(-PV_SENTTOT, -PV_REVTABLE, -PV_GRADVIOL) %>%
+    filter(across(everything(), ~!is.na(.x)))
+
+prisonOrNotAll <-
+    probations %>%
+    select(-PV_SENTTOT, -PV_REVTABLE, -PV_GRADVIOL, -XCRHISSR) %>%
+    filter(across(everything(), ~!is.na(.x)))
+
+prisonOrNotMissings <-
+    probations %>%
+    mutate(PV_GRADVIOL = if_else(is.na(PV_GRADVIOL), "Missing", PV_GRADVIOL)) %>%
+    select(-PV_SENTTOT, -PV_REVTABLE) %>%
+    filter(across(everything(), ~!is.na(.x)))
+
+logitModel <- glm(PV_SENTIMP ~., data = prisonOrNot, family = "binomial")
+logitMissing <- glm(PV_SENTIMP ~., data = prisonOrNotMissings, family = "binomial")
+summary(logitModel)
+summary(logitMissing)
+
+logitModelC <- glm(PV_SENTIMP ~., data = prisonOrNotC, family = "binomial")
+summary(logitModelC)
+
+logitModelAll <- glm(PV_SENTIMP ~., data = prisonOrNotAll, family = "binomial")
+summary(logitModelAll)
+```
+
+OLS regression for sentence length conditional on receiving a prison sentence.
+
+```{r}
+revocationSentenceLength <-
+    probations %>%
+    select(-PV_REVTABLE, -PV_SENTIMP) %>%
+    filter(across(everything(), ~!is.na(.x)))
+
+olsModel <- lm(log(PV_SENTTOT) ~ ., data = revocationSentenceLength)
+summary(olsModel)
+```
+
+Multinomial Regression on Guideline Departures
+
+```{r}
+departures <-
+    probations %>%
+    select(-PV_SENTIMP, -PV_SENTTOT) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(PV_REVTABLE = as.factor(PV_REVTABLE))
+
+multinomialModels <-
+    map(list("Above Range", "Below Range", "Within Range"),
+        function(df, level) {
+            df$PV_REVTABLE <- relevel(df$PV_REVTABLE, ref = level)
+            nnet::multinom(PV_REVTABLE ~ ., data = df)},
+        df = departures)
+
+map(multinomialModels, summary)
+
+multinomialDf <- tidy(multinomialModels[[2]], exponentiate = T)
+```
+
+Logsitic Regressions for Guideline Departures
+
+```{r}
+withinVsDepart <-
+    probations %>%
+    select(-PV_SENTIMP, -PV_SENTTOT) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(PV_REVTABLE = case_when(PV_REVTABLE == "Within Range" ~ 1,
+                                   PV_REVTABLE == "Below Range" ~ 0,
+                                   PV_REVTABLE == "Above Range" ~ 0))
+
+logitModel2 <- glm(PV_REVTABLE ~., data = withinVsDepart, family = "binomial")
+summary(logitModel2)
+```
+
+```{r}
+BelowVsAbove <-
+    probations %>%
+    select(-PV_SENTIMP, -PV_SENTTOT) %>%
+    filter(across(everything(), ~!is.na(.x))) %>%
+    mutate(PV_REVTABLE = case_when(PV_REVTABLE == "Within Range" ~ NA_real_,
+                                   PV_REVTABLE == "Below Range" ~ 0,
+                                   PV_REVTABLE == "Above Range" ~ 1))
+
+logitModel3 <- glm(PV_REVTABLE ~., data = BelowVsAbove, family = "binomial")
+summary(logitModel3)
+```
+
