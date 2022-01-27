@@ -1,0 +1,134 @@
+---
+title: "Assignment 1: Nathan Flemming, Sun Lee, and Joe Risi"
+output: html_document
+---
+
+```{r}
+library(here)
+library(vroom)
+library(dplyr)
+library(ggplot2)
+```
+
+## Part A - Reading in and cleaning the data
+
+Before answering any of the questions, we read in and clean the data. Reading in the data was fairly easy, and the only cleaning we did was to only keep those ngrams which represent a year and represent a year after 1874 (so 1875 and on).
+
+```{r, warning = F, message = F}
+# Read in ngram data
+engrams <-
+  vroom(here("group-assign1", "googlebooks-eng-all-1gram-20120701-1.gz"),
+        col_names = F)
+
+# trim to just 4 digit numbers that could be years
+engrams <- engrams[nchar(engrams$X1)==4,]
+engrams <- engrams[!grepl("\\D", engrams$X1),]
+
+# trim to ngrams and years 1875-1975
+engrams$X1 <- as.numeric(engrams$X1)
+engrams <- engrams[engrams$X1 > 1874,]
+engrams <- engrams[engrams$X2 > 1874,]
+
+# rename variables for clarity
+engrams <- 
+  engrams %>% 
+  rename(ngram = X1,
+         year = X2,
+         match_count = X3,
+         volume_count = X4)
+
+# read in total_count
+total <-
+  read.table(text =
+               gsub(",",
+                    "\t",
+                    readLines(
+                      here("group-assign1",
+                           "googlebooks-eng-all-totalcounts-20120701.txt"))))
+
+total <- as.data.frame(matrix(total, ncol =4, byrow = T))
+
+# rename variables for clarity
+total <-
+  total %>% 
+  rename(year = V1,
+         match_count = V2,
+         page_count = V3,
+         volume_count = V4)
+```
+
+## Part B - Recreate Figure 3a, Main Panel
+
+```{r}
+# subsetting data for 1883, 1910, 1950
+fig3dat <- subset(engrams, ngram == 1883 | ngram == 1910 | ngram == 1950)
+total$year <- as.numeric(total$year)
+total$match_count <- as.numeric(total$match_count)
+total <- subset(total, year >= 1875)
+
+# merging total counts and raw counts
+fig3dat <- merge(fig3dat, total, "year")
+
+# calculate proportions for each ngram
+fig3dat$match_prop <- fig3dat$match_count.x / fig3dat$match_count.y
+
+# graph proportion against year
+ggplot(data = fig3dat, aes(year, match_prop)) +
+    geom_line(aes(group = ngram, color = factor(ngram))) +
+    theme_bw()
+```
+
+## Part C - Compare results to the official Google Ngram
+
+[Our results largely match](https://books.google.com/ngrams/graph?content=1883%2C1910%2C1950&year_start=1875&year_end=1975&corpus=15&smoothing=0&case_insensitive=true#) with what we find when we use Google's official Ngram Viewer tool.
+
+## Part D - Recreate Figure 3a, Main Panel Using Raw Counts
+
+```{r}
+# graph frequency against year
+ggplot(data = fig3dat, aes(year, match_count.x)) +
+  geom_line(aes(group = ngram, color = factor(ngram))) +
+    theme_bw()
+```
+
+## Part E - Differences between Part B and Part D
+
+From the two graphs, we found that the proportion gradually decreased while the raw counts did not. The raw counts, in fact, usually would decline after peaking but then slowly increase eventually surpassing their earlier peaks. We speculate that the difference might be due to an increasing number of publications being digitized over time (i.e. the denominator is increasing). This suggests a competing interpretation of the data. It may not be the case that publications focus less on previous years as time goes on. Instead, it may be the case that a similar amount of publications (or more) focus on previous years as time goes on, but over time more publications focus on other things thus diluting mentions of previous years and making them seem relatively less important. Previous years are just as important as they were, but there are just many other things becoming available over time in Google's digital data set so previous years seem less relatively important.
+
+## Part F - Recreate Figure 3a, Subset panel (half-life)
+
+We see the findings are substantively different from what Michel et al. (2011) found. Rather than a persistent downward trend over time, values bounce around and there appears to be no temporal trend. If anything, earlier years (1875 - 1885) are forgotten more quickly than later years. From just before 1950 and onward, the half-lives of years never fall below 10 years while the half-lives of the years 1875 - 1885 never exceed 10 years. Furthermore, the period of time from around 1890 to 1910 is especially well remembered.
+
+```{r}
+join <-
+  total %>%
+  select(year, match_count) %>%
+  rename(total_count = match_count) %>%
+  inner_join(engrams, by = "year") %>%
+  select(-volume_count) %>%
+  mutate(proportion = match_count / total_count) %>%
+  group_by(ngram) %>%
+  mutate(max_proportion = max(proportion),
+         half_max_proportion = max_proportion / 2,
+         half_life_reached = if_else(proportion <= half_max_proportion, T, F),
+         max_year = if_else(proportion == max(max_proportion), year, 0),
+         max_year = max(max_year)) %>%
+  ungroup()
+
+half_life_year <-
+  join %>%
+  group_by(ngram) %>%
+  filter(half_life_reached == T & year >= max(max_year)) %>%
+  filter(year == min(year)) %>%
+  rename(half_life_year = year) %>%
+  ungroup() %>%
+  mutate(half_life = half_life_year - max_year)
+
+ggplot(half_life_year, aes(x = ngram, y = half_life)) +
+    geom_line() +
+    theme_bw()
+```
+
+## Part G - Differences between Part F and Figure 3a (subset) in Michel et al. (2011)
+
+We identified years with half-lives 1.5 times above or below the interquartile range as outliers. The years 1877, 1878, and 1942 were forgotten particularly quickly while 1893, 1910, and 1900 were forgotten particularly slowly. We speculate that the years that were succeeded by much more memorable years may be forgotten more quickly. For instance, 1942 was forgotten more quickly because of the events of 1943 or 1877 and 1878 were overshadowed by the election of 1880. Rapid fading from memory may also be due to artifacts in the data. 1900 and 1910, on the other hand, are 'landmark years' marking the turn of the century and the end of the first decade of the new century explaining why they would appear frequently in books for many years.
