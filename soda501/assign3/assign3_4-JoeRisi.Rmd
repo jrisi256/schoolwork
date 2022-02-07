@@ -8,6 +8,7 @@ library(here)
 library(dplyr)
 library(purrr)
 library(readr)
+library(rvest)
 library(jsonlite)
 ```
 
@@ -25,4 +26,18 @@ df <-
 
 ```{r}
 write_tsv(df, here("assign3", "cleaned-json.tsv"))
+```
+
+```{r}
+cleaned_text <- map(df$Content, function(dirty_text) {
+    
+    dirty_text %>%
+        read_html() %>%
+        html_element("bodytext") %>%
+        html_text()
+})
+
+df$Content <- unlist(cleaned_text)
+
+write_tsv(df, here("assign3", "cleaned-text.tsv"))
 ```
