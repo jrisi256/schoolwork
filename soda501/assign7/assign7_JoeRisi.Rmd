@@ -1,0 +1,93 @@
+---
+title: "Assignment 7 - Joseph Risi"
+output: html_document
+---
+
+```{r}
+library(here)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(purrr)
+```
+
+```{r}
+elections <-
+    read_csv(here("assign7",
+                  "CentreCountyPrecinctResults2016GeneralElection.txt")) %>%
+    select(-County, -ElecYear, -Election, -ElecDate, -Descr, -VoteFor,
+           -Candidate, -Posn, -PctCnt, -Total, -PctTot) %>%
+    filter(Contest %in% c("PRESIDENTIAL ELECTORS", "UNITED STATES SENATOR",
+                          "ATTORNEY GENERAL", "STATE TREASURER",
+                          "AUDITOR GENERAL", "BALLOTS CAST - TOTAL"))
+```
+
+## Finding the 2-Party Vote Share for Democrats
+
+* Filter out all records not pertaining to Democrats or Republicans.
+* Group by the Precinct Number, Precinct Name, and Contest. **Split operation**.
+* For each grouping, find the vote share for both Republicans and Democrats. **Apply + Combine Operation**.
+* Keep only records pertaining to the Democratic vote share.
+* Rename the records for the Contest column as they will become our new columns.
+* Make the data wide. Use Precinct Number and Precinct Name as the id columns. Use Contest for column names. Use the Democratic 2-party vote share as the values.
+
+## Finding the Roll Off
+
+* Group by the Precinct Number, Precinct Name, and Contest.
+* For each grouping, find the total number of votes cast. **Split operation**.
+* Calculate the roll of i.e. the percentage of voters who voter for President but not for other offices. **Apply + Combine Operation**.
+* Rename the records for the Contest column as they will become our new columns.
+* Make the data wide. Use Precinct Number and Precinct Name as the id columns. Use Contest for column names. Use the roll off as the values.
+
+```{r}
+# Find the Democratic 2-Party Vote Share
+d2_pshare <-
+    elections %>%
+    filter(Party %in% c("DEMOCRATIC", "REPUBLICAN"),
+           Contest != "BALLOTS CAST - TOTAL") %>%
+    group_by(PrecNo, PrecName, Contest) %>%
+    mutate(prcnt = 100 * (Count / sum(Count))) %>%
+    ungroup() %>%
+    filter(Party == "DEMOCRATIC") %>%
+    mutate(Contest = case_when(Contest == "PRESIDENTIAL ELECTORS" ~ "D2Pre",
+                               Contest == "UNITED STATES SENATOR" ~ "D2Sen",
+                               Contest == "ATTORNEY GENERAL" ~ "D2Att",
+                               Contest == "AUDITOR GENERAL" ~ "D2Aud",
+                               Contest == "STATE TREASURER" ~ "D2Tre")) %>%
+    pivot_wider(id_cols = c("PrecNo", "PrecName"),
+                names_from = Contest,
+                values_from = prcnt)
+
+# Find the Roll off
+rolloff <-
+    elections %>%
+    filter(Contest != "BALLOTS CAST - TOTAL") %>%
+    group_by(PrecNo, PrecName, Contest) %>%
+    summarise(sum = sum(Count)) %>%
+    mutate(rolloff = 100 * (1 - sum / sum[Contest == "PRESIDENTIAL ELECTORS"])) %>%
+    ungroup() %>%
+    filter(Contest != "PRESIDENTIAL ELECTORS") %>%
+    mutate(Contest = case_when(Contest == "UNITED STATES SENATOR" ~ "ROSen",
+                               Contest == "ATTORNEY GENERAL" ~ "ROAtt",
+                               Contest == "AUDITOR GENERAL" ~ "ROAud",
+                               Contest == "STATE TREASURER" ~ "ROTre")) %>%
+    pivot_wider(id_cols = c("PrecNo", "PrecName"),
+                names_from = Contest,
+                values_from = rolloff)
+
+# Total Number of Ballots Cast
+total <-
+    elections %>%
+    filter(Contest == "BALLOTS CAST - TOTAL") %>%
+    select(PrecNo, PrecName, Count) %>%
+    rename(Tot = Count)
+
+# Bind all the analyses together
+final <-
+    full_join(d2_pshare, rolloff, by = c("PrecNo", "PrecName")) %>%
+    full_join(total, by = c("PrecNo", "PrecName")) %>%
+    relocate(Tot, .after = PrecName) %>%
+    relocate(ROSen, .before = ROAtt)
+
+write_csv(final, here("assign7", "CentreCounty.csv"))
+```
