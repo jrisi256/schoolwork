@@ -173,6 +173,7 @@ dmypy.json
 
 # Virtual Environment
 /soda501/soda501
+/soda502/soda502
 
 # Data
 *.gz
