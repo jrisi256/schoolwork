@@ -52,6 +52,9 @@ V(net)       # The vertices of the "net" object
 E(net)$type  # Edge attribute "type"
 V(net)$media # Vertex attribute "media"
 
+# We can get back the vertex ids
+V(net)$name
+
 # Find nodes and edges by attribute:
 # (that returns oblects of type vertex sequence/edge sequence)
 V(net)[media == "BBC"]
@@ -265,3 +268,268 @@ plot(net, vertex.color = col,
      edge.arrow.size = 0.6, 
      vertex.label.color="white")
 ```
+
+We can also highlight specific paths in the network. Below we calculate the shortest path length.
+
+```{r}
+# It will only find the shortest path for one node listed in the from field
+# However if you list multiple to nodes, it will find shortest paths for each of those nodes
+news_path <- shortest_paths(net,
+                            from = V(net)[media == "MSNBC"],
+                            to = V(net)[media == "New York Post" | media == "NY Times"],
+                            output = "both") # return nodes and edges
+
+# Generate edge colors
+edge_color <- rep("gray80", ecount(net))
+edge_color[unlist(news_path$epath)] <- "orange"
+
+# Generate edge weights
+edge_weights <- rep(2, ecount(net))
+edge_weights[unlist(news_path$epath)] <- 4
+
+# Generate node color
+node_color <- rep("gray40", vcount(net))
+node_color[unlist(news_path$vpath)] <- "gold"
+
+plot(net, vertex.color = node_color, edge.color = edge_color, 
+     edge.width = edge_weights, edge.arrow.mode = 0)
+```
+
+We can also highlight edges going into or out of a vertex.
+
+```{r}
+inc_edges <- incident(net, V(net)[media == "Wall Street Journal"], mode = "all")
+
+# Set edges colors
+edge_color <- rep("gray80", ecount(net))
+edge_color[inc_edges] <- "orange"
+
+# Set vertex colors
+node_color <- rep("gray40", vcount(net))
+node_color[V(net)$media == "Wall Street Journal"] <- "gold"
+
+plot(net, vertex.color = node_color, edge.color = edge_color, edge.arrow.size = 0.2)
+
+# Joe playing around
+# How would you color every incident vertex?
+inc_vertices <- unique(as.vector(get.edges(net, inc_edges)))
+node_color <- rep("gray40", vcount(net))
+node_color[inc_vertices] <- "gold"
+
+plot(net, vertex.color = node_color, edge.color = edge_color, edge.arrow.size = 0.2)
+
+# An easier way is now illustrated
+# Find all nodes one step out from the focal actor
+neigh_nodes <- neighbors(net, V(net)[media == "Wall Street Journal"], mode = "out")
+
+# We can use this function to find the neighbors of multiple nodes
+neigh_nodes2 <- adjacent_vertices(net, V(net)[media == "Wall Street Journal" | media == "NY Times"], mode = "out")
+
+# We can use this function to find nodes more than one step out.
+neigh_nodes3 <- ego(net, order = 2, nodes = V(net)[media == "Wall Street Journal" | media == "NY Times"], mode = "out")
+
+node_color <- rep("gray40", vcount(net))
+node_color[V(net)$media == "Wall Street Journal"] <- "gold"
+node_color[neigh_nodes] <- "#ff9d00"
+plot(net, vertex.color = node_color, edge.arrow.size = 0.2)
+
+# We can also highlight groups by marking them (in this case, it is arbitrary)
+plot(net, mark.groups = list(c(1, 4, 5, 8), c(15:17)),
+     mark.col = c("#C5E5E7","#ECD89A"), mark.border = NA)
+```
+
+### Interactive plotting
+
+Note that the plot must be open when you run the tkplot.getcoords() function.
+
+```{r}
+tkid <- tkplot(net)
+l <- tkplot.getcoords(tkid) # Grab the coordinates from our customization
+plot(net, layout = l)
+```
+
+### Plotting 2-mode networks
+
+```{r}
+V(net2)$color[V(net2)$type] <- "orange"
+V(net2)$color[!V(net2)$type] <- "steel blue"
+
+V(net2)$shape[V(net2)$type] <- "circle"
+V(net2)$shape[!V(net2)$type] <- "square"
+
+V(net2)$label[V(net2)$type] <- ""
+V(net2)$label[!V(net2)$type] <- nodes2$media[!V(net2)$type]
+
+V(net2)$label.cex = 0.6
+V(net2)$label.font = 2
+
+plot(net2, vertex.label.color = "white", vertex.size = (2 - V(net2)$type) * 8)
+
+# Sometimes it can be useful to visualize the nodes as text
+plot(net2, vertex.label = nodes$media, vertex.label.color = V(net2)$color,
+     vertex.shape = "none")
+```
+
+We can also generate and plot bipartite projections. What are bipartite projections? You typically project the graph onto one of the two node sets. After projecting, the graph is constructed so it only contains nodes from that set. In our example, it will only contain nodes from the consumers or media producers categories. The resulting graph is one such that it only contains nodes from one of the categories and edges between nodes exist because they share a connection with a node from the other set.
+
+We can also calculate weighted projections.
+
+```{r}
+net2_bp <- bipartite.projection(net2)
+
+plot(net2_bp$proj1, vertex.label.color = "black", vertex.label.dist = 1)
+plot(net2_bp$proj2, vertex.label.color = "black", vertex.label.dist = 1,
+     vertex.label = nodes2$media[is.na(nodes2$media.type)])
+```
+
+### Multiplex networks
+
+A multiplex network is one in which multiple types of ties can exist between nodes. When it comes to visualizing these connections, it can get messy very quickly particularly if the ties overlap. One useful function to help settle these issues is `r curve.multiple`. This function is able to optimally bend the curves so they all appear visible.
+
+```{r}
+multigtr <- graph(edges = c(1, 2, 1, 2, 1, 2), n = 2)
+l <- layout_with_kk(multigtr)
+
+plot(multigtr, vertex.color = "lightsteelblue", vertex.frame.color = "white", 
+     vertex.size = 40, vertex.shape = "circle", vertex.label = NA,
+     edge.color = c("gold", "tomato", "yellowgreen"), edge.width = 5,
+     edge.arrow.size = 3, edge.curved = curve_multiple(multigtr), layout = l)
+```
+
+## Plotting graphs using other packages
+
+### network package
+
+Another popular package for visualizing graphs is the network package. The notation is different and some slight other differences, but the packages are largely otherwise pretty similar.
+
+As in igraph, we can generate a *network* object from an edge list, an adjacency matrix, or an incidence matrix. One specific thing to pay attention to here is the ignore.eval parameter. It is set to TRUE by default, and that setting causes the network object to disregard edge weights.
+
+```{r}
+library(network)
+
+net3 <- network(links, vertex.attr = nodes, matrix.type = "edgelist", loops = T,
+                multiple = F, ignore.eval = F)
+
+# We access elements of the graph similar to how we would access them in igraph
+net3[,]
+
+# To get and set attributes of the network
+net3 %n% "net.name" <- "Media Network"
+
+# To get and set attributes of the nodes
+net3 %v% "media"
+
+# To get and set attributes of the edges
+net3 %e% "type"
+```
+
+Let's plot a graph using the network package.
+
+```{r}
+# Set the color attribute for nodes based on their media type
+net3 %v% "col" <- c("gray70", "tomato", "gold")[net3 %v% "media.type"]
+
+# You only need to use the %v% syntax when doing operations.
+# technically do not need it for vertex.col.
+plot(net3,
+     vertex.cex = (net3 %v% "audience.size") / 7,
+     vertex.col = net3 %v% "col")
+
+# A plot returns coordinates which you can be saved to be used in other plots
+l <- plot(net3, vertex.cex = (net3 %v% "audience.size") / 7, vertex.col = "col")
+plot(net3, vertex.cex = (net3 %v% "audience.size") / 7, vertex.col = "col",
+     coord = l)
+```
+
+You can also graph interactively
+
+```{r}
+plot(net3, vertex.cex = (net3 %v% "audience.size") / 7,
+     vertex.col = "col", interactive = T)
+```
+
+### ggplot
+
+We can use our igraph objects directly with ggplot.
+
+```{r}
+library(ggraph)
+
+# You can have it choose colors automatically
+ggraph(net, layout = "lgl") +
+    geom_edge_fan(color = "gray50", width = 0.8, alpha = 0.5) +
+    geom_node_point(color = V(net)$media.type, size = 8)
+
+# Or manually
+colrs <- c("gray50", "tomato", "gold")
+V(net)$color <- colrs[V(net)$media.type]
+
+ggraph(net, layout = "lgl") +
+    geom_edge_fan(color = "gray50", width = 0.8, alpha = 0.5) +
+    geom_node_point(color = V(net)$color, size = 8)
+
+# But really we should be using the aes() function to do this right
+# Hard to set multiple colors at once
+ggraph(net, layout = "lgl") +
+    geom_edge_link(aes(color = type)) +
+    geom_node_point(aes(size = audience.size)) +
+    geom_node_text(aes(label = media), repel = T)
+```
+
+### other ways to represent a graph
+
+You can use a heatmap.
+
+```{r}
+# converts a graph to an adjacency matrix
+# When we set sparse = F, we get a matrix filled with zeroes
+netm <- as_adjacency_matrix(net, attr = "weight", sparse = F)
+colnames(netm) <- V(net)$media
+rownames(netm) <- V(net)$media
+
+palf <- colorRampPalette(c("gold", "dark orange"))
+
+# Rowv and Colv turn off the dendrograms.
+# Scale = none ensures the values are not centered and scaled
+# We have to reverse the order of the columns so the heatmap lines up
+heatmap(netm[, 17:1], Rowv = NA, Colv = NA, col = palf(50), scale = "none")
+```
+
+You can also graph descriptive summary plots.
+
+```{r}
+deg.dist <- degree_distribution(net, mode = "all")
+plot(x = 0:max(degree(net)), y = deg.dist, xlab="Degree",
+     ylab="Relative Frequency")
+
+deg.dist <- degree_distribution(net, cumulative = T, mode = "all")
+plot(x = 0:max(degree(net)), y = 1 - deg.dist, xlab="Degree",
+     ylab="Cumulative Frequency")
+```
+
+### Interactive plots using Javascript
+
+The tutorial has a few more examples of the cool things you can do. I am also tired and do not feel like going through the rest of the interactive network visualizations.
+
+```{r}
+library(visNetwork)
+visNetwork(nodes, links)
+
+vis.nodes <- nodes
+vis.links <- links
+
+vis.nodes$shape  <- "dot"  
+vis.nodes$shadow <- TRUE # Nodes will drop shadow
+vis.nodes$title  <- vis.nodes$media # Text on click
+vis.nodes$label  <- vis.nodes$type.label # Node label
+vis.nodes$size   <- vis.nodes$audience.size # Node size
+vis.nodes$borderWidth <- 2 # Node border width
+
+vis.nodes$color.background <- c("slategrey", "tomato", "gold")[nodes$media.type]
+vis.nodes$color.border <- "black"
+vis.nodes$color.highlight.background <- "orange"
+vis.nodes$color.highlight.border <- "darkred"
+
+visNetwork(vis.nodes, vis.links)
+```
+
