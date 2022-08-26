@@ -404,6 +404,8 @@ Another popular package for visualizing graphs is the network package. The notat
 
 As in igraph, we can generate a *network* object from an edge list, an adjacency matrix, or an incidence matrix. One specific thing to pay attention to here is the ignore.eval parameter. It is set to TRUE by default, and that setting causes the network object to disregard edge weights.
 
+Incidence matrices are usually used to represent two-mode or bipartite graphs (the resulting matrix representation does not necessarily have to be a square matrix). Adjacency matrices are always square since they are always one-mode.
+
 ```{r}
 library(network)
 
