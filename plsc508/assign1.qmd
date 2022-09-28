@@ -1,0 +1,37 @@
+---
+title: "Joseph Risi - Assignment 1"
+format: pdf
+---
+
+Load in necessary packages and set the seed.
+
+```{r}
+set.seed(123)
+library(igraph)
+```
+
+```{r}
+graph <- sample_gnp(20, 0.2, directed = T)
+V(graph)$size <- 5
+E(graph)$arrow.size <- 0.5
+
+fr_layout_gr <- layout_with_fr(graph)
+random_layout_gr <- layout_randomly(graph)
+
+plot(graph, l = fr_layout_gr, vertex.label = NA, main = "Network displayed using FR algorithm")
+plot(graph, l = random_layout_gr, vertex.label = NA, main = "Network displayed randomly")
+```
+
+```{r}
+fr_graph <- sample_smallworld(1, 50, 2, 0.1)
+
+V(fr_graph)$size <- degree(fr_graph) * 2
+E(fr_graph)$arrow.size <- 0.5
+
+fr_layout_fr <- layout_with_fr(fr_graph)
+random_layout_fr <- layout_randomly(fr_graph)
+
+plot(fr_graph, l = fr_layout_fr, vertex.label = NA, main = "Network displayed using FR algorithm")
+plot(fr_graph, l = random_layout_fr, vertex.label = NA, main = "Network displayed randomly")
+```
+
