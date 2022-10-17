@@ -1,0 +1,84 @@
+---
+title: "Chp. 2 - Inferential Network Analysis"
+format: pdf
+---
+
+```{r}
+library(sna)
+library(ina)
+library(devtools)
+```
+
+```{r}
+# Contains how many times senators co-sponsored a bill with each other
+# not a symmetric adjacency matrix, it is directed
+# Senator A -> Senator B, senator co-sponsors a bill that Senator B proposed
+# Also contains economic and cultural ideology scores (higher values, more con.)
+data(cosponsorship)
+```
+
+```{r}
+SenNet <- senlist$net
+conservatism <- dwnom[, 1]
+
+# only count an edge if they co-sponsor 9 or more times
+SenNetBinary <- 1 * SenNet > 9
+node.color <- gray((conservatism - min(conservatism)) / max(conservatism - min(conservatism)))
+
+set.seed(1234)
+plot(network(SenNetBinary),
+     vertex.col = node.color,
+     edge.col = rgb(150, 150, 150, 150, maxColorValue = 355))
+```
+
+## CUG Test
+
+* **FUN**: The function which will be used to generate the test statistic. In this case, `r gtrans()` returns the transitivity of the graph.
+* **cmode**: The type of conditioning to be done or what is to be held constant in our null distribution. What are we testing? This will determine what we hold constant. Options include: size of the graph (size), edge count or edge value distribution (edges), or dyad census or dyad value distribution (dyad.census).
+    * In our example, the dyad distribution is simply the number of dyads in which there are no edges, one edge, or two edges (no edges between i and j, an edge between i and j or vice versa, and an edge between **i and j** and **j and i**).
+
+Results show way more transitivity than would exist by chance.
+
+```{r}
+set.seed(1234)
+
+cugResults <- cug.test(dat = SenNetBinary,
+                       FUN = gtrans,
+                       cmode = "dyad.census",
+                       reps = 500)
+
+cugResults
+plot(cugResults)
+```
+
+## QAP
+
+* To use QAP, the covariates must be represented as matrices that are equal in dimension to the adjacency matrix.
+    * **ideoDist**: A distance matrix in which cell i, j gives the absolute difference between the ideology scores of i and j.
+    * **ideoSend**: A matrix in which cell i, j gives the ideology score of i (i.e. the edge sender).
+    * **ideoRec**: A matrix in which cell i, j gives the ideology score of j (i.e., the edge receiver).
+    
+Interpretation works much like it does for OLS. The expected number of co-sponsorships between Senators decreases by 2.825 units for every unit increase in ideological distance (using the first measure of ideology).
+
+Notice how we would incorrectly assume significant results for the second ideology measure (when it comes to sender/receiver results) if we used OLS. This would be a Type I error (false positive). It arises from incorrectly assuming element of the dependent variable matrix arose independently.
+
+```{r}
+# use the first measure of ideology
+ideoDist <- as.matrix(dist(dwnom[, 1]))
+ideoSend <- matrix(dwnom[, 1], nrow(dwnom), nrow(dwnom), byrow = F)
+ideoRec <- matrix(dwnom[, 1], nrow(dwnom), nrow(dwnom), byrow = T)
+
+# use the second measure of ideology
+ideoDist2 <- as.matrix(dist(dwnom[, 2]))
+ideoSend2 <- matrix(dwnom[, 2], nrow(dwnom), nrow(dwnom), byrow = F)
+ideoRec2 <- matrix(dwnom[, 2], nrow(dwnom), nrow(dwnom), byrow = T)
+
+covariates <-
+    list(ideoDist = ideoDist, ideoSend = ideoSend, ideoRec = ideoRec,
+         ideoDist2 = ideoDist2, ideoSend2 = ideoSend2, ideoRec2 = ideoRec2)
+
+# OLS
+ols <- netlm(SenNet, covariates, nullhyp = "classical")
+set.seed(5)
+qap <- netlm(SenNet, covariates, nullhyp = "qap", reps = 100)
+```
