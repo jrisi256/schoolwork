@@ -1,0 +1,47 @@
+---
+title: "Chp. 3 - Introduction to ERGM"
+format: pdf
+---
+
+Directed edges represent when one manage goes to another manager for professional advice.
+
+```{r}
+library(ina)
+library(network)
+
+data(Krackhardt)
+Net <- Krackhardt
+Pal <- colorRampPalette(c("#e5f5e0", "#31a354"))
+```
+
+## Tenure
+
+```{r}
+set.seed(1)
+tenure <- get.vertex.attribute(Net, "Tenure") # network style syntax
+col.tenure <- Pal(length(unique(tenure)))[as.numeric(cut(tenure, breaks = length(unique(tenure))))]
+plot(Net, edge.col = "gray", label.col = "black", vertex.cex = 1.5,
+     vertex.col = col.tenure, label = tenure, main = "Tenure")
+```
+
+## Age
+
+```{r}
+set.seed(1)
+age <- get.vertex.attribute(Net, "Age") # network style syntax
+col.age <- Pal(length(unique(age)))[as.numeric(cut(age, breaks = length(unique(age))))]
+plot(Net, edge.col = "gray", label.col = "black", vertex.cex = 1.5,
+     vertex.col = col.age, label = age, main = "Age")
+```
+
+## Department
+
+```{r}
+set.seed(1)
+dept <- get.vertex.attribute(Net, "Department") # network style syntax
+cols <- c("#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99")
+col.dept <- cols[match(dept, unique(dept))]
+plot(Net, edge.col = "gray", label.col = "black", vertex.cex = 1.5,
+     vertex.col = col.dept, label = dept, main = "Department")
+```
+
