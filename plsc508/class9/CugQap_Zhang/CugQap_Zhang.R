@@ -32,7 +32,6 @@ plot(nngos)
 
 # textbook recommended using 1000 reps but for this tutorial we only use 200 
 # to save time 
-
 grecip(nngos)
 bedge = cug.test(dat = nngos, grecip, cmode = "edge", reps = 200)
 bedge
@@ -65,4 +64,5 @@ logi
 
 # QAP
 qap <- netlogit(nngos, covariates, nullhyp = "qap", reps = 100)
+qap$names <- c("(intercept)", names(covariates))
 qap
