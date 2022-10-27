@@ -45,3 +45,86 @@ plot(Net, edge.col = "gray", label.col = "black", vertex.cex = 1.5,
      vertex.col = col.dept, label = dept, main = "Department")
 ```
 
+## Endogeneous variables in the ERGM
+
+* **mutual**: Represents the reciprocity statistic (measure of the likelihood that a tie will form from i to j given that j has a tie going to i). In this advice network, we suspect this will be an important feature. Positive values indicate reciprocity is more important. Negative values indicate it is not (more of a mentor-mentee relationship with the mentees sending ties to mentors asking for advice but not the other way around).
+* **ostar**: Some individuals may be more likely than other individuals to seek out advice, in network lingo, to send ties. So an "out two star" captures the probability of an out-tie on the likelihood of sending a new tie. An "out three star" captures the probability of for every pair of ties sent on the likelihood of a new third tie being sent. So on and so forth. Including more than out star allows for more flexibility and thresholding to emerge. For example, if the ostar 3 has a positive coefficient, this means a node is more likely to send additional ties once that node has sent at least two ties. We could continue adding stars, but the theoretical import as well as the data's ability to differentiate between higher order stars diminishes pretty quickly.
+* **transitiveties**: It seems like cliques might emerge or communities. This endogeneous property captures the idea that the friend of a friend is a friend. **Note** we use this specific statistic (counts the number of edges that are embedded in at least one transitive triple) because it is **less degenerate**. This problem is discussed later in the book.
+
+## Exogeneous variables
+
+* **reportsto**: We believe managers are more likely to get advice from their superiors. So we indicate this variable is an edge level variable.
+* **Age & Tenure**: Because we also want to capture the effects of Age and Tenure, we use `r nodeicov` and `nodeocov` to capture their values for the incoming node as well as the outgoing node. We use also use `absdiff` to capture the absolute valued difference in these values.
+* **edges**: The count of the number of edges in the network. This is analogous to the intercept term in a regression model. Indeed if endogeneous terms are not included, the edges coefficient will be equivalent to the intercept in a dyadic logistic regression fit to the network adjacency matrix.
+
+## Final Notes
+
+* The MCMC.burnin and sample size values are discussed later. Suffice to say that larger values lead to more accurate estimates, but they take longer to estimate.
+
+```{r}
+library(ergm)
+
+set.seed(510)
+modl <- ergm(Net ~ edges + mutual + ostar(2:3) + transitiveties +
+                 edgecov("reportsto") + nodeicov("Tenure") + nodeocov("Tenure") +
+                 absdiff("Tenure") + nodeicov("Age") + nodeocov("Age") +
+                 absdiff("Age"),
+             control = control.ergm(MCMC.samplesize = 5000,
+                                    MCMC.burnin = 10000,
+                                    MCMLE.maxit = 10),
+             verbose = T)
+```
+
+## Evaluating model fit
+
+Model fit can tell us if the observed network is typical of the distribution represented by the ERGM specification and estimates.
+
+Common way to assess model fit is by comparing the observed network with networks simulated from the estimated model. Thus the standard approach involves simulating a large number of networks from the set of parameters estimated by the ERGM an comparing the topology of the simulated networks to the observed network.
+
+* Choose several descriptive measures (e.g., degree, shared partners).
+* Create box plots representing the measures of central tendency and variance in the data from the simulated networks.
+* Then plot the values from your actual network.
+* The closer you are to the median, the more typical your results are.
+
+When plotting our goodness of fit values, we want to see if the black line (real, observed values) follows the trend of the medians from the simulated data.
+
+Visually, it looks like the in degree and out degree plots do not perfectly line up with our observed values.
+
+Inspecting the goodness of fit object, we can see the number of observations per simulation run, the minimum, the mean, and the maximum. I think. Not sure entirely how to interpret this stuff. Anyway, the p-values are important. Small p-values are bad because they indicate statistically significant differences between simulated and observed values. For our model, most p-values are large which is great.
+
+```{r}
+gof1 <- ergm::gof(modl)
+plot(gof1)
+```
+
+## Interpretation
+
+* **Network Level**: Exponetiating our variables, the relative likelihood of observing a network one unit greater on the chosen value will be the value of the coefficient.
+    * Holding all other variables constant, the relative likelihood of observing a network that includes more out two-star is: `r exp(coefficients(modl)[["ostar2"]])`.
+* **Edge Level**: Examine the conditional probability of a particular edge existing in the network. The equation is in my notes. Presentation of this quantity can be difficult because it will vary from dyad-to-dyad. You can present particularly low or high probability dyads or compute summary statistics on the set of all dyad probabilities.
+
+```{r}
+summary(modl)
+```
+
+Let's try to interpret a more simple model. `nodematch` is a homophily term which counts the number of times any two vertices which share an edge have the same qualitative attribute.
+
+```{r}
+set.seed(510)
+mod0 <- ergm(Net ~ edges + nodematch("Level"),
+             control = control.ergm(MCMC.samplesize = 5000,
+                                    MCMC.burnin = 10000,
+                                    MCMLE.maxit = 10),
+             verbose = T)
+```
+
+* The log odds of an edge forming in the advice network is given by edges: `r coefficients(mod0)[["edges"]]` **multiplied** by the change in the edge count **plus** `coefficients(mod0)[["nodematch.Level"]]` **multiplied** by the change in the count of same level edges.
+* The log odds of a tie forming across levels is `r coefficients(mod0)[["edges"]]`.
+* If we take the inverse logistic transformation: `r 1 / (1 + exp(coefficients(mod0)[["edges"]]))`, this produces the probability of such a tie (across levels).
+* We can do the same thing for same-level ties. `r 1 / (1 + exp(coefficients(mod0)[["nodematch.Level"]]))`. Notice how the probability is higher for same-level ties to form.
+
+```{r}
+summary(mod0)
+```
+
+Well, I will have to talk about this with Bruce because `xergm` is no longer supported. But it seems like a cool function that would allow us to calculate the probability of a specific tie being formed. In the textbook, they also go over a pretty involved example where they create a null model in which reciprocity (mutual) is set to 0. They then calculate differences in the probabilities of edges forming in the null model vs. estimated model and find that there is not much difference in the probability of a dyad forming with no edge or only one edge. But a dyad with two edges (reciprocal) is 50% more likely under the estimated model.
