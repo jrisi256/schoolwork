@@ -481,6 +481,18 @@
         "trust"
       ]
     },
+    "ergm.count": {
+      "Package": "ergm.count",
+      "Version": "4.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "099b8f6e4b68dd554ca9c1f133ea8492",
+      "Requirements": [
+        "ergm",
+        "network",
+        "statnet.common"
+      ]
+    },
     "evaluate": {
       "Package": "evaluate",
       "Version": "0.17",
@@ -739,6 +751,25 @@
       "Hash": "32600a0bea839c4d0ac998d7c547ecf7",
       "Requirements": []
     },
+    "haven": {
+      "Package": "haven",
+      "Version": "2.5.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "5b45a553fca2217a07b6f9c843304c44",
+      "Requirements": [
+        "cli",
+        "cpp11",
+        "forcats",
+        "hms",
+        "lifecycle",
+        "readr",
+        "rlang",
+        "tibble",
+        "tidyselect",
+        "vctrs"
+      ]
+    },
     "here": {
       "Package": "here",
       "Version": "1.0.1",
@@ -870,6 +901,17 @@
       "Repository": "CRAN",
       "Hash": "7ab57a6de7f48a8dc84910d1eca42883",
       "Requirements": []
+    },
+    "job": {
+      "Package": "job",
+      "Version": "0.3.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "3c762f5650c9f3f79336937e4cfb5e43",
+      "Requirements": [
+        "digest",
+        "rstudioapi"
+      ]
     },
     "jquerylib": {
       "Package": "jquerylib",
@@ -1622,6 +1664,23 @@
         "lattice"
       ]
     },
+    "statnet": {
+      "Package": "statnet",
+      "Version": "2019.6",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "29f1ce50eb7d1294caafef2c07ee3b66",
+      "Requirements": [
+        "ergm",
+        "ergm.count",
+        "network",
+        "networkDynamic",
+        "sna",
+        "statnet.common",
+        "tergm",
+        "tsna"
+      ]
+    },
     "statnet.common": {
       "Package": "statnet.common",
       "Version": "4.7.0",
@@ -1668,6 +1727,24 @@
       "Hash": "90b28393209827327de889f49935140a",
       "Requirements": [
         "cpp11"
+      ]
+    },
+    "tergm": {
+      "Package": "tergm",
+      "Version": "4.1.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "5063f080fcf15f8c711f699077bf3120",
+      "Requirements": [
+        "MASS",
+        "coda",
+        "ergm",
+        "network",
+        "networkDynamic",
+        "nlme",
+        "purrr",
+        "robustbase",
+        "statnet.common"
       ]
     },
     "testthat": {
@@ -1807,6 +1884,18 @@
       "Repository": "CRAN",
       "Hash": "f50614d2145ba1012b62ff75f2129d5b",
       "Requirements": []
+    },
+    "tsna": {
+      "Package": "tsna",
+      "Version": "0.3.5",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "592e0f1e84df929ad3560e86a0dce04b",
+      "Requirements": [
+        "network",
+        "networkDynamic",
+        "statnet.common"
+      ]
     },
     "tweenr": {
       "Package": "tweenr",
