@@ -1,0 +1,121 @@
+---
+title: "Descriptives of Network"
+format: pdf
+---
+
+## Basic Information
+
+* Reference: Ba, Bocar A., Dean Knox, Jonathan Mummolo, and Roman Rivera. 2021. "The Role of Officer Race and Gender in Police-Civilian Interactions in Chicago." Science.
+* Github (for my code): https://github.com/jrisi256/policing
+* Data location: https://codeocean.com/capsule/8907164/tree/v1
+
+```{r, message = F}
+set.seed(42)
+library(here)
+library(dplyr)
+library(readr)
+library(igraph)
+library(ggplot2)
+library(backbone)
+library(lubridate)
+```
+
+```{r, message = F}
+# Read in the arrests
+arrests <-
+    read_csv(here("merge-arrests-shifts",
+                  "output",
+                  "arrests_officers_assignments_ba_max.csv")) %>%
+    filter(!is.na(arrest_id)) %>%
+    # add in a letter to differentiate arrest vertices for officer vertices
+    mutate(arrest_id = paste0(arrest_id, "a")) %>%
+    select(officer_id, arrest_id) %>%
+    # Have to do this due to errors in cleaning from Ba et al. 2021
+    distinct(officer_id, arrest_id, .keep_all = T)
+```
+
+## Nodal attributes
+
+```{r, fig.height = 4, fig.width = 6, message = F}
+officers <-
+    read_csv(here("create-officer-assignments",
+                  "output",
+                  "active_officers_ba.csv")) %>%
+    mutate(age = 2015 - birth_year,
+           years_exp = (ymd("2015-12-01") - appointed_month) / dyears(1))
+
+ggplot(officers, aes(x = officer_race)) + geom_bar() + theme_bw()
+ggplot(officers, aes(x = officer_gender)) + geom_bar() + theme_bw()
+ggplot(officers, aes(x = spanish)) + geom_bar() + theme_bw()
+ggplot(officers, aes(x = age)) + geom_histogram(bins = 40) + theme_bw()
+ggplot(officers, aes(x = years_exp)) + geom_histogram(bins = 40) + theme_bw()
+```
+
+## Plotting graphs
+
+```{r}
+# Create an igraph object for each of the above edge list data frames
+arrest_net <- graph_from_data_frame(arrests, directed = F)
+
+# Turn each of the igraph objects into bipartite graphs
+V(arrest_net)$type <- V(arrest_net)$name %in% arrests$arrest_id
+
+# Bipartite projection and add in officers who had no arrests with other officers
+# They get removed during the bipartite projection.
+arrest_net_bp <- bipartite.projection(arrest_net, which = F, multiplicity = T)
+no_arrests <- officers %>% filter(!(officer_id %in% V(arrest_net_bp)$name))
+arrest_net_bp <-
+    arrest_net_bp %>%
+    add_vertices(nrow(no_arrests), name = no_arrests$officer_id)
+
+# Backbone extraction too computationally demanding at this point in time
+# arrest_net_bb <-
+#     sdsm(arrest_net, alpha = 0.075, significance = T, class = "igraph")
+```
+
+```{r}
+arrest_net_bp_no_isolates <- delete.vertices(arrest_net_bp,
+                                             degree(arrest_net_bp) == 0)
+
+plot(arrest_net_bp,
+     vertex.label = NA,
+     vertex.size = 1,
+     main = "Arrest Network of Officers",
+     edge.width = 0.5)
+
+plot(arrest_net_bp_no_isolates,
+     vertex.label = NA,
+     vertex.size = 1,
+     main = "Arrest Network of Officers - No isolated nodes",
+     edge.width = 0.5)
+```
+
+## Centrality Measures
+
+```{r}
+degree_centrality <- igraph::degree(arrest_net_bp)
+betweenness <- igraph::betweenness(arrest_net_bp)
+eg_centrality <- igraph::evcent(arrest_net_bp)
+
+hist(degree_centrality)
+hist(betweenness)
+hist(eg_centrality$vector)
+```
+
+The three measures of centrality are largely in agreement. The vast majority of nodes (officers) lie on the periphery of the network while there are a tiny, tiny number of nodes very central in the network. This raises the interesting question of whom these officers are exactly. It could be the result of my data design decisions since I am combining four years of interaction data into one graph. So these arrest relationships represent arrests over time. So these officers could be those officers who moved around the most during this four year period. However, it is also possible they could be very **influential** or **aggressive** officers who, in some sense, are able to make arrests with many other officers. I am struggling to think through exactly what mechanism they could achieve this since officers are largely consigned to their own geographic area. It will be useful to divide up the network temporally to disambiguate these results.
+
+## Transitivity
+
+```{r}
+transitivity <- transitivity(arrest_net_bp)
+```
+
+The transitivity score for the arrest network is: `r transitivity`. This score can be thought of as the ratio of the observed number of closed triplets to the maximum number of closed triplets possible. So in this network about 20% of the triads present are transitive. This suggests a moderately high degree of clustering in that officers who share a co-arresting officer are more likely in the future to make an arrest together themselves. Further analysis would need to be done to disentangle to what degree this is due to the structural properties of the Chicago Police Force (i.e., officers are placed in units and work almost exclusively with officers in their unit) versus individual decision-making processes.
+
+## Assortative Mixing
+
+```{r}
+assort_degree <- assortativity_degree(arrest_net_bp, directed = F)
+```
+
+The degree assortativity for the arrest network is: `r assort_degree`. Degree assortativity is a measure of how often officers, who make many arrests, are making those arrests together. We do see a moderately strong association suggesting officers who make many arrests are more likely to be making those arrests together. As is the case with transitivity though, more analysis would need to be done to understand why we observe this phenomenon. Perhaps this result is driven by the fact that officers are likely to make more arrests in high crime areas, and they will be making those arrests together. Perhaps another factor in the environment which is driving results (e.g. in line with hypotheses from racial conflict, we might expect areas with the highest degree of mismatch in terms of the racial composition of the police force vs. the racial composition of the community to have more officers making more arrests together). Perhaps there is a group, or maybe several groups, of aggressive police officers who make lots of arrests together. 
