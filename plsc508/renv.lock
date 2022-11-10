@@ -147,6 +147,18 @@
         "sys"
       ]
     },
+    "backbone": {
+      "Package": "backbone",
+      "Version": "2.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "8ff09ccb3fe348389a829a8a4a73fdba",
+      "Requirements": [
+        "Matrix",
+        "Rcpp",
+        "igraph"
+      ]
+    },
     "base64": {
       "Package": "base64",
       "Version": "2.0.1",
@@ -894,6 +906,17 @@
       "Hash": "6154ec2223172bce8162d4153cda21f7",
       "Requirements": []
     },
+    "intergraph": {
+      "Package": "intergraph",
+      "Version": "2.0-2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "d0b8656ef6f15b4b20aef33a7e1cd2af",
+      "Requirements": [
+        "igraph",
+        "network"
+      ]
+    },
     "isoband": {
       "Package": "isoband",
       "Version": "0.2.5",
@@ -1016,6 +1039,17 @@
       "Repository": "CRAN",
       "Hash": "d6d092bfa0373c781b001487d637d5df",
       "Requirements": []
+    },
+    "lubridate": {
+      "Package": "lubridate",
+      "Version": "1.9.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "2af4550c2f0f7fbe7cbbf3dbf4ea3902",
+      "Requirements": [
+        "generics",
+        "timechange"
+      ]
     },
     "magick": {
       "Package": "magick",
@@ -1865,6 +1899,16 @@
         "purrr",
         "rlang",
         "vctrs"
+      ]
+    },
+    "timechange": {
+      "Package": "timechange",
+      "Version": "0.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "4657195cc632097bb8d140d626b519fb",
+      "Requirements": [
+        "cpp11"
       ]
     },
     "tinytex": {
