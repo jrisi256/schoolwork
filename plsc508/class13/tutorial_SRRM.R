@@ -81,7 +81,7 @@ plot(fit_srrm)
 #assess the convergence of MCMC
 #Z-scores for a test of equality of means between the first and last parts of the chain
 # If larger than 1.75, then something's wrong
-geweke.diag(fit_srrm$BETA) 
+geweke.diag(fit_srrm$BETA)
 geweke.diag(fit_srrm$VC) 
 
 
